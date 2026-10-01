@@ -1,0 +1,5 @@
+# generated artifacts
+test/browser-selftest.html
+src/all.js
+src/harness-check.js
+*.log

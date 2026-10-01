@@ -1,0 +1,2181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>White House Accord — Super Intelligence Signing Simulator</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#07090f; overflow:hidden; }
+  body { display:flex; align-items:center; justify-content:center; }
+  #wrap { position:relative; }
+  canvas { display:block; image-rendering:auto; cursor:default; }
+  #n { position:fixed; left:-9999px; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="stage"></canvas></div>
+<div id="n">GAME</div>
+<script>
+
+/* ==================== data.js ==================== */
+/* ==================== data.js — cast, ledger, residues, endings ==================== */
+'use strict';
+
+/* Seeded RNG (mulberry32) — deterministic runs, testable. */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let RND = mulberry32(20260929);
+
+/* Palette — luxury editorial: navy / gold / wood / cream. */
+const PAL = {
+  navy: '#101b2d', navy2: '#16233c', navy3: '#1d2f4d',
+  gold: '#c9a227', gold2: '#e8c96a', gold3: '#f4e3a1',
+  cream: '#f5efdd', cream2: '#e9e0c6',
+  wood: '#5d3f28', wood2: '#7a5535', wood3: '#936b42',
+  ink: '#0b0e14', dusk: '#0c1220',
+  orange: '#f0924f', orange2: '#d97b35',
+  red: '#c0392b', green: '#3f7d4e', blue: '#3a6ea5'
+};
+
+/* ---- CAST ---- */
+const CAST = [
+  { id:'musk',     name:'Elon Musk',       co:'xAI · SpaceX · Tesla', quote:'“Grading each other’s homework.”', signed:true,  starter:true },
+  { id:'huang',    name:'Jensen Huang',    co:'Nvidia',               quote:'“This is sand. It is software, not a new species.”', signed:true,  starter:true },
+  { id:'zuck',     name:'Mark Zuckerberg', co:'Meta',                 quote:'“Robust controls. Board reports.”', signed:true,  starter:true },
+  { id:'pichai',   name:'Sundar Pichai',   co:'Google / Alphabet',    quote:'“Hundreds of billions. Review, then release.”', signed:true,  starter:true },
+  { id:'amodei',   name:'Dario Amodei',    co:'Anthropic',            quote:'“Self-policing is not enough.”', signed:true,  starter:true },
+  { id:'brockman', name:'Greg Brockman',   co:'OpenAI',               quote:'“Sam is in San Francisco. So I’m here.”', signed:true,  starter:true },
+  { id:'trump',    name:'Donald J. Trump', co:'President of the United States', quote:'“Morally binding. Almost like a constitution.”', signed:true,  starter:false, locked:true },
+  { id:'maye',     name:'???', co:'', quote:'', signed:false, starter:false, hidden:true },
+  { id:'rogan',    name:'???', co:'', quote:'', signed:false, starter:false, hidden:true },
+  { id:'sam',      name:'???', co:'', quote:'', signed:false, starter:false, hidden:true },
+  { id:'vlad',     name:'???', co:'', quote:'', signed:false, starter:false, hidden:true },
+  { id:'toly',     name:'???', co:'', quote:'', signed:false, starter:false, hidden:true },
+  { id:'pavel',    name:'???', co:'', quote:'', signed:false, starter:false, hidden:true },
+  { id:'barron',   name:'???', co:'', quote:'', signed:false, starter:false, hidden:true }
+];
+
+/* ---- ACT I — where your body is at the table ----
+   startSeat: x position on the walk line. ledger: opening tilt. toast: first frame tell. */
+const STARTS = {
+  musk:     { x: 0.18, ledger:{ optics:+2, substance:-1, drama:+1 }, toast:'You are already next to Trump. The cameras found you before the lunch started.' },
+  huang:    { x: 0.30, ledger:{ optics:+1, substance:+1 },           toast:'You are the infrastructure priest. People listen. Then they glaze.' },
+  zuck:     { x: 0.42, ledger:{ optics:+1, drama:+1 },               toast:'Your glasses might be recording. Several people just checked.' },
+  pichai:   { x: 0.50, ledger:{ rapport:+5, meme:-2 },               toast:'You are the adult in the room. Easy rapport. Zero virality.' },
+  amodei:   { x: 0.68, ledger:{ substance:+2, optics:-1 },           toast:'You are parked far from the power sandwich. It feels colder here.' },
+  brockman: { x: 0.80, ledger:{ drama:+1 },                          toast:'Sam is on speaker from DevDay. The absence is the plot.' }
+};
+
+/* ---- TALKS: 3 lines in real cadence + 2 replies + a micro-game.
+   Reply residue = ledger deltas + flags (never shown as numbers).
+   ref: a line that fires on later talks, referencing earlier residues. ---- */
+const TALKS = {
+  musk: {
+    mini:'phone',
+    lines:[
+      'ELON: We agreed to joint monitoring. Board committees.',
+      'ELON: Basically grading each other’s homework.',
+      'ELON: I might post about it. Probably.'
+    ],
+    ref: (flags) => flags.darioTesting ? 'ELON: Dario calls it testing. I call it a slowdown play. Same letters, different tax.' : null,
+    replies:[
+      { t:'“Post one. Right now.”', r:+6, residue:{ meme:+2, optics:+1, drama:+1 }, flag:'elonPosted', toast:'Posted. The internet will find it before dessert.' },
+      { t:'“Maybe draft it first?”', r:-3, residue:{ meme:-1 }, flag:'elonDrafted', toast:'Elon nods. The draft dies in a folder forever.' }
+    ]
+  },
+  huang: {
+    mini:'sand',
+    lines:[
+      'JENSEN: Everyone calls it a five-layer cake. Controls, team, auditor, committee.',
+      'JENSEN: I call it sand. Sand → wafer → GPU → superintelligence.',
+      'JENSEN: This is not a new species. It is software.'
+    ],
+    ref: (flags) => flags.sandDone ? 'JENSEN: You did the sand. So you know. The vial does the talking now.' : null,
+    replies:[
+      { t:'“Hand me the vial.”', r:+6, residue:{ optics:+1, substance:+1 }, flag:'sandDone', toast:'The vial glints. The leather jacket does half the work.' },
+      { t:'“It’s a cake, actually.”', r:-3, residue:{ meme:-1 }, flag:'cakeFight', toast:'Jensen smiles anyway. The vial stays in the pocket.' }
+    ]
+  },
+  zuck: {
+    mini:'caption',
+    lines:[
+      'MARK: Meta glasses are live-captioning the lunch right now.',
+      'MARK: Robust controls, board reports, third-party red teaming.',
+      'MARK: If Trump says something wrong, it goes on the jumbotron.'
+    ],
+    ref: (flags) => flags.zuckCaption ? 'MARK: The captions corrected themselves. Mostly. There is one word I cannot fix.' : null,
+    replies:[
+      { t:'“What happens on the jumbotron?”', r:+6, residue:{ optics:+1, drama:+1 }, flag:'zuckWatch', toast:'The jumbotron brightens. It is very interested in this table.' },
+      { t:'“Your glasses are recording us?”', r:-3, residue:{ drama:+1 }, flag:'zuckPressed', toast:'Mark smiles with no eyes. The recording continues.' }
+    ]
+  },
+  pichai: {
+    mini:'stamp',
+    lines:[
+      'SUNDAR: Google is investing hundreds of billions of dollars.',
+      'SUNDAR: Our policy is simple. Review, then release.',
+      'SUNDAR: These folders ship in ninety seconds.'
+    ],
+    ref: (flags) => flags.stamped ? 'SUNDAR: You reviewed them. Officially. It is in the minutes now.' : null,
+    replies:[
+      { t:'“Let’s review them together.”', r:+6, residue:{ optics:+2, meme:-2, substance:+1 }, flag:'stamped', toast:'REVIEWED. The lunch feels official and slightly dead.' },
+      { t:'“Ship them. It’s a luncheon.”', r:-3, residue:{ meme:+1 }, flag:'shipped', toast:'The folders ship unstamped. Somewhere, a lawyer opens a tab.' }
+    ]
+  },
+  amodei: {
+    mini:'slider',
+    lines:[
+      'DARIO: Self-policing is not enough. I said that out loud, at the table.',
+      'DARIO: There should be testing regimes. Actual ones.',
+      'DARIO: The frosting on the cake is not the cake.'
+    ],
+    ref: (flags) => flags.darioTesting ? 'DARIO: The testing held. Trump noticed. That is not always good.' : null,
+    replies:[
+      { t:'“You’re the only one saying this.”', r:+6, residue:{ substance:+3, rapport:-2 }, flag:'darioTesting', toast:'Somewhere down the table, Musk calls it a slowdown play.' },
+      { t:'“The Accord is a constitution, though.”', r:-4, residue:{ substance:-1 }, flag:'constitution', toast:'JOHNSON winces. Someone said constitution again.' }
+    ]
+  },
+  brockman: {
+    mini:'pen',
+    lines:[
+      'GREG: Sam is at DevDay in San Francisco. So I’m the one holding the pen.',
+      'GREG: He says Dots are here. Nobody knows what Dots are.',
+      'GREG: If his FaceTime rings, ignore the merch.'
+    ],
+    ref: (flags) => flags.samCall ? 'GREG: Sam posted anyway. He was always going to post anyway.' : null,
+    replies:[
+      { t:'“Hold the line, Greg.”', r:+6, residue:{ optics:+1, drama:-1 }, flag:'penHeld', toast:'Greg holds the pen like it is the whole ceremony.' },
+      { t:'“What is a Dot?”', r:-3, residue:{ drama:+1, meme:+1 }, flag:'samCall', toast:'Sam posts. He was always going to post anyway.' }
+    ]
+  },
+  tombrown: {
+    mini:null,
+    lines:[
+      'TOM BROWN: Why am I here?',
+      'TOM BROWN: I design the suits. I sign nothing. It is fine. It is fine.'
+    ],
+    ref: () => null,
+    replies:[
+      { t:'“Stay for the photo.”', r:+1, residue:{ optics:+1 }, flag:'tomSeen', toast:'Tom Brown stays. He will be in the caption now.' },
+      { t:'(walk away)', r:0, residue:{}, flag:null, toast:'You leave Tom Brown at the far end. He understands completely.' }
+    ]
+  }
+};
+
+/* ---- ambient jokes: one line, triggered by real things in the scene ---- */
+const AMBIENT = {
+  americaGov:  'america.gov resolves to a 404. Nobody at the table notices.',
+  protest:      'Outside the window: nine protesters and one very good drum.',
+  sacks:        'SACKS, off to the side: “This is the Bretton Woods of Super Intelligence.”',
+  johnson:      'JOHNSON winces. Someone said “constitution” again.',
+  bezos:        'BEZOS says nothing. It is the loudest thing in the room.',
+  lisaSu:       'LISA SU, passing: “Nice jacket.” (to Jensen, who takes it as infrastructure policy)',
+  karp:         'KARP: “We must take responsibility for the dangers we know about.”',
+  samText:      'SAM (DevDay): “Dots are here. The lunch happened. These facts are related.”'
+};
+
+/* ---- SIGNING ---- */
+const SIGNERS = ['trump','pichai','amodei','zuck','brockman','musk','huang'];
+const SIGN_LINES = [
+  'The pen is up. Cameras are pointed at the signature page.',
+  'Greg holds the pen out. Sam’s FaceTime window is on the laptop. Dots are here.',
+  'The document reads: Donald J. Trump, President of the Unites States.',
+  'Jensen whispers: “It says Unites.” You have about two seconds.'
+];
+const SIGN_CHOICES = [
+  { id:'fix',   t:'Fix “Unites States”' },
+  { id:'asis',  t:'Sign it anyway' },
+  { id:'blame', t:'Blame staff' }
+];
+
+/* ---- GAGGLE (driveway, 20s): execs shoulder to shoulder, orange light.
+   Two beats are chosen by your flags. One beat is random. ---- */
+const GAGGLE_POOL = [
+  { who:'@MayeMusk',     t:'(hearts under the photo of Elon next to Trump)' },
+  { who:'@joerogan',     t:'“Morally binding” is a wild phrase. Wild.' },
+  { who:'@sama',         t:'Dots are here. It is a software update. It is also, sort of, a philosophical event.' },
+  { who:'@whitehousephotog', t:'[PHOTO] Execs shoulder to shoulder. Zuck pulled slightly forward. Trump more orange outside than inside.' }
+];
+function gaggleBeats(flags, ledger) {
+  const beats = [];
+  if (flags.elonPosted) beats.push({ who:'REPORTER', t:'“Mr. President — your first question is about the post, not biosecurity.”' });
+  else                  beats.push({ who:'REPORTER', t:'“Mr. President — is this biosecurity or bandwidth?”' });
+  if (flags.realRules)  beats.push({ who:'TRUMP', t:'“They want to stifle Super Intelligence. Terrible people.” (That is not what you said.)' });
+  if (flags.flattered)  beats.push({ who:'TRUMP', t:'“One of the most brilliant people in the world.” (He has forgotten your company.)' });
+  if (flags.zuckCaption) beats.push({ who:'@jumbotrong', t:'[CAPTION] “morally bidding” — live from the East Room.' });
+  const pool = GAGGLE_POOL.slice();
+  beats.push(pool[Math.floor(RND() * pool.length)]);
+  return beats;
+}
+
+/* ---- THE EIGHT ENDINGS.
+   Each: id, title, lines[6], artifact (in-world object), art (still variant). ---- */
+const ENDINGS = {
+  constitution: {
+    title:'THE CONSTITUTION OF NOTHING',
+    art:'pulitzer',
+    lines:[
+      'The photo is historic. The paper means little.',
+      '“Voluntary,” Johnson says again, wincing on the vowel.',
+      'The four layers exist in a folder nobody opens.',
+      'Trump calls it a constitution. Nobody checks it.',
+      'You are in the frame. The frame is the achievement.',
+      'Tomorrow the room is used for a luncheon about nicknames.'
+    ]
+  },
+  viralTypo: {
+    title:'THE VIRAL TYPO',
+    art:'monologue',
+    lines:[
+      'The Accord is remembered as “Unites States.”',
+      'Late-night hosts get a week of material. Free.',
+      'The internet signed the typo faster than Congress signed anything.',
+      'Maye still likes the photo. She was always going to.',
+      'The four layers are mentioned, once, in a correction.',
+      '“Unites” trends in nine countries. The Accord trends in none.'
+    ]
+  },
+  safetyCaucus: {
+    title:'THE SAFETY CAUCUS',
+    art:'cold',
+    lines:[
+      'The photo is worse. The quote is real.',
+      '“Testing regimes, actual ones” survives into the minutes.',
+      'Dario nods at you like you passed a test nobody announced.',
+      'The accelerationists mock the frost. The frost was the point.',
+      'You sat far from the power sandwich. The paperwork knows.',
+      'It is the bittersweet ending. It is also the only substantive one.'
+    ]
+  },
+  promptOff: {
+    title:'THE PROMPT-OFF',
+    art:'split',
+    lines:[
+      'The signing is a footnote to Grok vs Dots.',
+      'Trump tried both bots. He liked the one that flattered him.',
+      'Greg looks tired. He has been tired since 2015.',
+      'The Accord gets thirty seconds. The bots get the other four minutes.',
+      'Sam was not in the room. The room was about him anyway.',
+      'Split-screen: two logos, one president, zero layers.'
+    ]
+  },
+  sandSermon: {
+    title:'THE SAND SERMON',
+    art:'wafer',
+    lines:[
+      'Everyone remembers the vial of sand.',
+      'The Accord becomes an infrastructure keynote with a signature.',
+      'Lisa Su: “Nice jacket.” It enters the official record.',
+      'Sand → wafer → GPU → superintelligence. The room nods along.',
+      'Nobody mentions the four layers. The vial was better television.',
+      'Jensen leaves with the vial. The vial was always leaving with Jensen.'
+    ]
+  },
+  glassesLeak: {
+    title:'THE GLASSES LEAK',
+    art:'caption',
+    lines:[
+      'One wrong caption becomes the clip.',
+      '“Morally bidding” — live from the East Room, 41 million views.',
+      'Meta issues a statement about robust controls. It becomes a caption too.',
+      'The jumbotron apologizes in the same font as the error.',
+      'The Accord is a footnote to a subtitle.',
+      'Mark’s glasses record the apology. The apology leaks.'
+    ]
+  },
+  absentCEO: {
+    title:'THE ABSENT CEO',
+    art:'goblin',
+    lines:[
+      'OpenAI’s president signs while its CEO launches merch.',
+      'A goblin shirt is in the corner of the official photo.',
+      '“Dots are here.” The lunch happened. These facts are related.',
+      'Greg holds the pen like it is the whole company.',
+      'Sam was not in the room. The story keeps him in it anyway.',
+      'The pen is real. The Dots are real. The layers are a folder.'
+    ]
+  },
+  perfect: {
+    title:'THE GOLDEN AGE',
+    art:'golden',
+    lines:[
+      'The most official lunch in the history of lunches.',
+      'The typo was fixed. The photo is perfect. Nobody said the true thing.',
+      'The machine moved on. The machine was everyone.',
+      'Trump calls it tremendous. Tremendous is the whole record.',
+      'You are in the frame. The frame is empty. It is beautiful.',
+      'This is the darkest ending. It looks like a win.'
+    ]
+  }
+};
+
+/* provisional ending after Act II; signing can flip it one step */
+function computeEndingId(state) {
+  const L = state.ledger, f = state.flags;
+  if (f.zuckCaption && L.drama >= 2) return 'glassesLeak';
+  if (f.elonPosted && L.sam) return 'promptOff';
+  if (L.typoAlive && L.meme >= 3) return 'viralTypo';
+  if (f.darioTesting && L.substance >= 3 && L.optics <= 1) return 'safetyCaucus';
+  if (f.sandDone && L.optics >= 2) return 'sandSermon';
+  if (state.playerId === 'brockman' && !L.sam) return 'absentCEO';
+  if (L.optics >= 3 && L.substance >= 2 && L.drama <= 1 && !L.typoAlive) return 'perfect';
+  if (L.optics >= 3 && L.substance <= 1) return 'constitution';
+  if (L.meme >= 2) return 'viralTypo';
+  if (L.substance >= 2) return 'safetyCaucus';
+  return 'constitution';
+}
+
+/* end card lines: ending + who got the mic + typo + delayed jokes */
+function endLines(state) {
+  const L = state.ledger, f = state.flags, e = ENDINGS[state.endingId];
+  const lines = e.lines.slice();
+  if (L.mic === 'trump') lines[4] = 'Trump got the mic. It became a branding event: Super Intelligence, constitution, tremendous.';
+  if (L.mic === 'zuck')  lines[4] = 'Zuck got the mic. The country heard “robust internal controls” in one breath.';
+  if (L.mic === 'musk')  lines[4] = 'Musk got the mic. The country heard a two-word post.';
+  if (L.mic === 'amodei') lines[4] = 'Dario got the mic. The country heard one real sentence and then the feed cut.';
+  if (f.tomIgnored) lines[3] += ' (Tom Brown is in the caption anyway. Small, far end, present.)';
+  return lines.slice(0, 6);
+}
+
+/* share card: fake X post per ending */
+function shareCard(state) {
+  const L = state.ledger, f = state.flags;
+  const e = ENDINGS[state.endingId];
+  const who = f.elonPosted ? '@ElonMusk' : (f.zuckCaption ? '@jumbotrong' : '@WhiteHouse');
+  const txt = {
+    constitution: 'A historic Accord on Super Intelligence was signed today. Morally binding.',
+    viralTypo: 'Unites States.',
+    safetyCaucus: 'Testing regimes. Actual ones. Signed in a colder corner of the room.',
+    promptOff: 'Grok vs Dots. The president tried both. The Accord happened in between.',
+    sandSermon: 'Sand. Wafer. GPU. Superintelligence. The vial did the talking.',
+    glassesLeak: '[CAPTION] “morally bidding” — live from the East Room.',
+    absentCEO: 'Dots are here. The lunch happened. These facts are related.',
+    perfect: 'The Golden Age of Super Intelligence has begun. Tremendous.'
+  }[state.endingId];
+  return { who: who, txt: txt, likes: (12 + Math.floor(RND() * 88)) * (L.meme >= 3 ? 1000 : 100) + 'K' };
+}
+
+/* ==================== art.js ==================== */
+/* ==================== art.js — editorial vector caricatures ==================== */
+
+/* rounded-rect path */
+function rr(c, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, Math.min(255, (n >> 16) + amt));
+  const g = Math.max(0, Math.min(255, ((n >> 8) & 255) + amt));
+  const b = Math.max(0, Math.min(255, (n & 255) + amt));
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
+/* per-character art spec */
+const CHAR_ART = {
+  musk:     { skin:'#e8b088', hair:'buzz',   hairC:'#3a2e26', suit:'#232a33', shirt:'#e8e4da', tie:null,        exp:'deadpan', phone:true },
+  huang:    { skin:'#d9a06e', hair:'bald',   hairC:'#000',    suit:'#1a1a1c', shirt:'#111',    tie:null,        exp:'preacher', beads:true, vial:true, leather:true },
+  zuck:     { skin:'#e9c1a0', hair:'curls',  hairC:'#4a3423', suit:'#5a6470', shirt:'#c9ccc9', tie:null,        exp:'stiff', glasses:true },
+  pichai:   { skin:'#c98e5c', hair:'neat',   hairC:'#1c1712', suit:'#1c2c4e', shirt:'#eef0f2', tie:'#31518a',   exp:'smile' },
+  amodei:   { skin:'#e3bd9c', hair:'short',  hairC:'#2c2620', suit:'#2a2732', shirt:'#dcd9d0', tie:'#5a2a4f',   exp:'flat', glasses:true, beard:true },
+  brockman: { skin:'#eec2a2', hair:'short',  hairC:'#7a5a34', suit:'#33383f', shirt:'#e6e3dc', tie:null,        exp:'smile', laptop:true },
+  trump:    { skin:'#f0924f', hair:'swoop',  hairC:'#f0d080', suit:'#20242e', shirt:'#f2f0e8', tie:'#b02a20',   exp:'smile', trumpTie:true },
+  bezos:    { skin:'#e6b892', hair:'bald',   hairC:'#555',    suit:'#3a3f47', shirt:'#d8d8d8', tie:null,        exp:'flat' },
+  sacks:    { skin:'#e2b492', hair:'short',  hairC:'#5a4a38', suit:'#2c3038', shirt:'#e0ddd4', tie:'#3a4f7a',   exp:'deadpan', glasses:true },
+  lisa:     { skin:'#d9a878', hair:'long',   hairC:'#191410', suit:'#232830', shirt:'#cfd2d0', tie:null,        exp:'smile' },
+  karp:     { skin:'#e9c0a2', hair:'curls',  hairC:'#8a6a3c', suit:'#242830', shirt:'#e2dfd6', tie:null,        exp:'flat', glasses:true },
+  johnson:  { skin:'#eec4a4', hair:'side',   hairC:'#8a7a5c', suit:'#2e3440', shirt:'#e6e2d8', tie:'#7a2a2a',   exp:'wince' },
+  vance:    { skin:'#e8bd9c', hair:'short',  hairC:'#6a4a28', suit:'#262b36', shirt:'#dfe2e6', tie:'#3a5a8a',   exp:'flat', beard:true },
+  tombrown: { skin:'#e0b28c', hair:'short',  hairC:'#3a2c1e', suit:'#3a3630', shirt:'#d8d4ca', tie:'#6a6a2a',   exp:'deadpan' },
+  maye:     { skin:'#e9c6a8', hair:'long',   hairC:'#cfc4ae', suit:'#4a3a52', shirt:'#e2d8ea', tie:null,        exp:'smile', glasses:true },
+  rogan:    { skin:'#d99e6e', hair:'buzz',   hairC:'#2a2118', suit:'#2a2d33', shirt:'#3a3d44', tie:null,        exp:'flat', beard:true },
+  sam:      { skin:'#eec2a2', hair:'curls',  hairC:'#5a3a1e', suit:'#2c3038', shirt:'#dfe0e2', tie:null,        exp:'smile' },
+  vlad:     { skin:'#e4b894', hair:'short',  hairC:'#26201a', suit:'#23272e', shirt:'#e4e1d8', tie:null,        exp:'smile' },
+  toly:     { skin:'#eec2a2', hair:'neat',   hairC:'#1e1a16', suit:'#282c34', shirt:'#e2dfd8', tie:null,        exp:'deadpan', glasses:true },
+  pavel:    { skin:'#e2b08c', hair:'short',  hairC:'#1a1612', suit:'#22262c', shirt:'#d8d5ce', tie:null,        exp:'flat', beard:true },
+  barron:   { skin:'#eda173', hair:'side',   hairC:'#4a3a20', suit:'#1e222c', shirt:'#eceae2', tie:null,        exp:'deadpan' },
+  player:   { skin:'#e8bb96', hair:'short',  hairC:'#2e2418', suit:'#1c2a44', shirt:'#eef0f0', tie:'#8a6a2a',   exp:'smile' }
+};
+
+/* ---- head (drawn at origin, feet baseline is +H) ---- */
+function drawHead(c, a, s, blink, look) {
+  const hw = 13 * s;               // half-width of skull
+  c.save();
+  c.translate(0, -62 * s);
+  if (look) c.translate(look * 1.2 * s, 0);
+
+  /* ears */
+  c.fillStyle = shade(a.skin, -26);
+  c.beginPath(); c.ellipse(-hw - 1 * s, 1 * s, 2.4 * s, 3.6 * s, 0, 0, 7); c.fill();
+  c.beginPath(); c.ellipse(hw + 1 * s, 1 * s, 2.4 * s, 3.6 * s, 0, 0, 7); c.fill();
+
+  /* skull + jaw */
+  c.fillStyle = a.skin;
+  c.beginPath();
+  c.moveTo(-hw, -2 * s);
+  c.bezierCurveTo(-hw, -16 * s, hw, -16 * s, hw, -2 * s);          // cranium
+  c.bezierCurveTo(hw, 8 * s, 6 * s, 13 * s, 0, 13 * s);            // right jaw
+  c.bezierCurveTo(-6 * s, 13 * s, -hw, 8 * s, -hw, -2 * s);        // left jaw
+  c.fill();
+  /* subtle side shade */
+  c.fillStyle = 'rgba(0,0,0,0.07)';
+  c.beginPath();
+  c.moveTo(hw - 4 * s, -13 * s);
+  c.bezierCurveTo(hw + 2 * s, -4 * s, hw - 2 * s, 8 * s, 2 * s, 12 * s);
+  c.bezierCurveTo(hw - 1 * s, 6 * s, hw - 5 * s, -4 * s, hw - 4 * s, -13 * s);
+  c.fill();
+
+  /* hair styles */
+  c.fillStyle = a.hairC;
+  if (a.hair === 'swoop') {                       // Trump
+    c.beginPath();
+    c.moveTo(-hw - 1.5 * s, -1 * s);
+    c.bezierCurveTo(-hw - 3 * s, -14 * s, -6 * s, -19 * s, 2 * s, -18 * s);
+    c.bezierCurveTo(10 * s, -17.5 * s, hw + 3 * s, -13 * s, hw + 1 * s, -4 * s);
+    c.bezierCurveTo(hw - 2 * s, -9 * s, 4 * s, -12 * s, -2 * s, -10 * s);
+    c.bezierCurveTo(-7 * s, -8.5 * s, -10 * s, -5 * s, -hw - 1.5 * s, -1 * s);
+    c.fill();
+  } else if (a.hair === 'bald') {
+    c.fillStyle = 'rgba(0,0,0,0.05)';
+    c.beginPath(); c.ellipse(0, -14.5 * s, 9 * s, 3.4 * s, 0, 0, 7); c.fill();
+  } else if (a.hair === 'buzz') {
+    c.beginPath();
+    c.moveTo(-hw, -3 * s);
+    c.bezierCurveTo(-hw - 1 * s, -14 * s, hw + 1 * s, -14 * s, hw, -3 * s);
+    c.closePath(); c.fill();
+  } else if (a.hair === 'curls') {
+    c.beginPath();
+    c.moveTo(-hw - 1 * s, -2 * s);
+    c.bezierCurveTo(-hw - 2 * s, -15 * s, hw + 2 * s, -15 * s, hw + 1 * s, -2 * s);
+    c.quadraticCurveTo(hw - 4 * s, -8 * s, 0, -8.5 * s);
+    c.quadraticCurveTo(-hw + 4 * s, -8 * s, -hw - 1 * s, -2 * s);
+    c.fill();
+  } else if (a.hair === 'neat') {
+    c.beginPath();
+    c.moveTo(-hw, -3 * s);
+    c.bezierCurveTo(-hw - 1.5 * s, -13.5 * s, hw + 1.5 * s, -13.5 * s, hw, -3 * s);
+    c.quadraticCurveTo(hw - 6 * s, -10 * s, 0, -10.5 * s);
+    c.quadraticCurveTo(-hw + 6 * s, -10 * s, -hw, -3 * s);
+    c.fill();
+  } else if (a.hair === 'short' || a.hair === 'side') {
+    const side = a.hair === 'side';
+    c.beginPath();
+    c.moveTo(-hw - (side ? 1 : 0), -2 * s);
+    c.bezierCurveTo(-hw - 1 * s, -14 * s, hw + (side ? 0 : 1) * 1, -14 * s, hw, -3.5 * s);
+    c.quadraticCurveTo(0, -9 * s, -hw - (side ? 1 : 0), -2 * s);
+    c.fill();
+    if (side) { c.fillRect(-hw - 0.6 * s, -8 * s, 2 * s, 7 * s); }
+  } else if (a.hair === 'long') {
+    c.beginPath();
+    c.moveTo(-hw - 2 * s, 12 * s);
+    c.bezierCurveTo(-hw - 5 * s, -8 * s, -8 * s, -17 * s, 0, -17 * s);
+    c.bezierCurveTo(8 * s, -17 * s, hw + 5 * s, -8 * s, hw + 2 * s, 12 * s);
+    c.lineTo(hw - 3 * s, 12 * s);
+    c.bezierCurveTo(hw, 0, 6 * s, -9 * s, 0, -9 * s);
+    c.bezierCurveTo(-6 * s, -9 * s, -hw, 0, -hw + 3 * s, 12 * s);
+    c.fill();
+  }
+
+  /* eyes */
+  const ey = -3.4 * s, ex = 4.6 * s;
+  c.strokeStyle = '#1a1613'; c.lineWidth = 1.15 * s; c.lineCap = 'round';
+  if (blink) {
+    c.beginPath(); c.moveTo(-ex - 2 * s, ey); c.lineTo(-ex + 2 * s, ey);
+    c.moveTo(ex - 2 * s, ey); c.lineTo(ex + 2 * s, ey); c.stroke();
+  } else {
+    c.fillStyle = '#fff';
+    c.beginPath(); c.ellipse(-ex, ey, 2.5 * s, 1.7 * s, 0, 0, 7); c.fill();
+    c.beginPath(); c.ellipse(ex, ey, 2.5 * s, 1.7 * s, 0, 0, 7); c.fill();
+    c.fillStyle = '#1a1613';
+    c.beginPath(); c.arc(-ex + (look || 0) * 1.1 * s, ey, 1.05 * s, 0, 7); c.fill();
+    c.beginPath(); c.arc(ex + (look || 0) * 1.1 * s, ey, 1.05 * s, 0, 7); c.fill();
+  }
+  /* brows */
+  c.strokeStyle = shade(a.hairC, -18); c.lineWidth = 1.5 * s;
+  c.beginPath(); c.moveTo(-ex - 2.6 * s, ey - 3.4 * s); c.lineTo(-ex + 2.2 * s, ey - 4 * s);
+  c.moveTo(ex - 2.2 * s, ey - 4 * s); c.lineTo(ex + 2.6 * s, ey - 3.4 * s); c.stroke();
+
+  /* nose */
+  c.strokeStyle = shade(a.skin, -55); c.lineWidth = 1.2 * s;
+  c.beginPath(); c.moveTo(0.4 * s, ey + 2 * s); c.quadraticCurveTo(1.6 * s, ey + 5 * s, -0.6 * s, ey + 6.4 * s); c.stroke();
+
+  /* mouth by expression */
+  c.strokeStyle = '#7a3a30'; c.lineWidth = 1.35 * s;
+  c.beginPath();
+  if (a.exp === 'smile')      { c.moveTo(-3 * s, 8.4 * s); c.quadraticCurveTo(0, 10.4 * s, 3 * s, 8.4 * s); }
+  else if (a.exp === 'stiff') { c.moveTo(-2.6 * s, 8.8 * s); c.lineTo(2.6 * s, 8.8 * s); }
+  else if (a.exp === 'wince') { c.moveTo(-2.8 * s, 9.4 * s); c.quadraticCurveTo(0, 7.6 * s, 2.8 * s, 9.4 * s); }
+  else if (a.exp === 'preacher') { c.moveTo(-2.2 * s, 9 * s); c.quadraticCurveTo(0, 9.8 * s, 2.2 * s, 9 * s); }
+  else                        { c.moveTo(-2.4 * s, 9 * s); c.lineTo(2.4 * s, 9 * s); }
+  c.stroke();
+
+  /* beard */
+  if (a.beard) {
+    c.fillStyle = shade(a.hairC, 10);
+    c.beginPath();
+    c.moveTo(-hw + 2 * s, 4 * s);
+    c.bezierCurveTo(-hw + 3 * s, 12 * s, -3 * s, 13.6 * s, 0, 13.6 * s);
+    c.bezierCurveTo(3 * s, 13.6 * s, hw - 3 * s, 12 * s, hw - 2 * s, 4 * s);
+    c.bezierCurveTo(hw - 5 * s, 8 * s, 5 * s, 9.6 * s, 0, 9.6 * s);
+    c.bezierCurveTo(-5 * s, 9.6 * s, -hw + 5 * s, 8 * s, -hw + 2 * s, 4 * s);
+    c.fill();
+  }
+  /* glasses */
+  if (a.glasses) {
+    c.strokeStyle = '#20242c'; c.lineWidth = 1.05 * s;
+    c.strokeRect(-ex - 3.2 * s, ey - 2.8 * s, 6.4 * s, 5.2 * s);
+    c.strokeRect(ex - 3.2 * s, ey - 2.8 * s, 6.4 * s, 5.2 * s);
+    c.beginPath(); c.moveTo(-ex + 3.2 * s, ey); c.lineTo(ex - 3.2 * s, ey); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.14)';
+    c.beginPath(); c.ellipse(ex - 1 * s, ey - 1 * s, 2.2 * s, 1.4 * s, -0.5, 0, 7); c.fill();
+  }
+  c.restore();
+}
+
+/* ---- torso / suit (origin at hips) ---- */
+function drawTorso(c, a, s, armPhase, pose) {
+  const w = 21 * s;   // half shoulder width
+  c.save();
+  /* legs for standing poses */
+  if (pose === 'stand' || pose === 'walk') {
+    const swing = pose === 'walk' ? Math.sin(armPhase) * 7 * s : 0;
+    c.fillStyle = shade(a.suit, -12);
+    rr(c, -9 * s + swing * 0.4, 0, 8 * s, 30 * s, 3 * s); c.fill();
+    rr(c, 1 * s - swing * 0.4, 0, 8 * s, 30 * s, 3 * s); c.fill();
+    c.fillStyle = '#14100c';
+    rr(c, -10 * s + swing * 0.4, 28 * s, 10 * s, 4.5 * s, 2 * s); c.fill();
+    rr(c, 0 * s - swing * 0.4, 28 * s, 10 * s, 4.5 * s, 2 * s); c.fill();
+  }
+  /* jacket */
+  c.fillStyle = a.suit;
+  c.beginPath();
+  c.moveTo(-w, -34 * s);
+  c.bezierCurveTo(-w - 2 * s, -18 * s, -w + 3 * s, -6 * s, -w + 6 * s, 0);
+  c.lineTo(w - 6 * s, 0);
+  c.bezierCurveTo(w - 3 * s, -6 * s, w + 2 * s, -18 * s, w, -34 * s);
+  c.closePath(); c.fill();
+  /* shirt V */
+  c.fillStyle = a.shirt;
+  c.beginPath();
+  c.moveTo(-8 * s, -34 * s);
+  c.lineTo(0, -22 * s);
+  c.lineTo(8 * s, -34 * s);
+  c.closePath(); c.fill();
+  /* lapels */
+  c.strokeStyle = shade(a.suit, 26); c.lineWidth = 1.6 * s;
+  c.beginPath();
+  c.moveTo(-8 * s, -34 * s); c.lineTo(-2 * s, -20 * s); c.lineTo(-6 * s, -12 * s);
+  c.moveTo(8 * s, -34 * s); c.lineTo(2 * s, -20 * s); c.lineTo(6 * s, -12 * s);
+  c.stroke();
+  /* tie */
+  if (a.tie) {
+    c.fillStyle = a.tie;
+    c.beginPath();
+    c.moveTo(-2.2 * s, -32 * s); c.lineTo(2.2 * s, -32 * s);
+    c.lineTo(1.4 * s, -12 * s); c.lineTo(0, -9 * s); c.lineTo(-1.4 * s, -12 * s);
+    c.closePath(); c.fill();
+    c.fillStyle = shade(a.tie, -22);
+    c.beginPath(); c.moveTo(-2.6 * s, -33.5 * s); c.lineTo(2.6 * s, -33.5 * s);
+    c.lineTo(2 * s, -30.5 * s); c.lineTo(-2 * s, -30.5 * s); c.closePath(); c.fill();
+  }
+  /* arms */
+  const armY = -32 * s;
+  c.strokeStyle = shade(a.suit, -8); c.lineWidth = 6.5 * s; c.lineCap = 'round';
+  if (pose === 'sit') {
+    /* hands forward onto table */
+    c.beginPath(); c.moveTo(-w + 2 * s, armY); c.quadraticCurveTo(-w - 6 * s, armY + 14 * s, -10 * s, 4 * s); c.stroke();
+    c.beginPath(); c.moveTo(w - 2 * s, armY); c.quadraticCurveTo(w + 6 * s, armY + 14 * s, 10 * s, 4 * s); c.stroke();
+    c.fillStyle = a.skin;
+    c.beginPath(); c.arc(-10 * s, 4 * s, 3.2 * s, 0, 7); c.fill();
+    c.beginPath(); c.arc(10 * s, 4 * s, 3.2 * s, 0, 7); c.fill();
+  } else if (pose === 'point') {
+    /* one arm raised in the Trump gesture */
+    c.beginPath(); c.moveTo(-w + 2 * s, armY); c.lineTo(-w - 2 * s, armY + 16 * s); c.stroke();
+    c.beginPath(); c.moveTo(w - 2 * s, armY); c.quadraticCurveTo(w + 8 * s, armY - 8 * s, w + 14 * s, armY - 18 * s); c.stroke();
+    c.fillStyle = a.skin;
+    c.beginPath(); c.arc(w + 14 * s, armY - 18 * s, 3.4 * s, 0, 7); c.fill();
+  } else {
+    const sw = pose === 'walk' ? Math.sin(armPhase) * 8 * s : 0;
+    c.beginPath(); c.moveTo(-w + 2 * s, armY); c.lineTo(-w + 3 * s + sw * 0.5, -2 * s); c.stroke();
+    c.beginPath(); c.moveTo(w - 2 * s, armY); c.lineTo(w - 3 * s - sw * 0.5, -2 * s); c.stroke();
+    c.fillStyle = a.skin;
+    c.beginPath(); c.arc(-w + 3 * s + sw * 0.5, -1 * s, 3 * s, 0, 7); c.fill();
+    c.beginPath(); c.arc(w - 3 * s - sw * 0.5, -1 * s, 3 * s, 0, 7); c.fill();
+  }
+  /* accessories in hand */
+  if (a.phone) {
+    c.fillStyle = '#0c0e12';
+    rr(c, 12 * s, -18 * s, 6 * s, 10 * s, 1.6 * s); c.fill();
+    c.fillStyle = 'rgba(140,180,255,0.85)';
+    rr(c, 12.8 * s, -17 * s, 4.4 * s, 7 * s, 1 * s); c.fill();
+  }
+  if (a.vial) {
+    c.fillStyle = 'rgba(240,220,150,0.9)';
+    rr(c, -17 * s, -10 * s, 4 * s, 9 * s, 2 * s); c.fill();
+    c.fillStyle = '#b09a54';
+    c.fillRect(-17 * s, -12 * s, 4 * s, 2.4 * s);
+  }
+  if (a.laptop) {
+    c.fillStyle = '#3a4048';
+    rr(c, 8 * s, -6 * s, 13 * s, 9 * s, 1.5 * s); c.fill();
+    c.fillStyle = 'rgba(150,190,255,0.8)';
+    rr(c, 9 * s, -5 * s, 11 * s, 6 * s, 1 * s); c.fill();
+  }
+  /* leather jacket collar (Jensen) */
+  if (a.leather) {
+    c.strokeStyle = '#0c0c0e'; c.lineWidth = 3 * s;
+    c.beginPath(); c.moveTo(-w + 1 * s, -33 * s); c.lineTo(-4 * s, -20 * s);
+    c.moveTo(w - 1 * s, -33 * s); c.lineTo(4 * s, -20 * s); c.stroke();
+  }
+  /* prayer beads (Jensen) */
+  if (a.beads) {
+    c.strokeStyle = '#c9a227'; c.lineWidth = 1.2 * s;
+    c.beginPath(); c.arc(0, -30 * s, 7.5 * s, 0.5, 2.64); c.stroke();
+  }
+  c.restore();
+}
+
+/* ---- full figure ---- */
+function drawFigure(c, id, x, y, s, opt) {
+  opt = opt || {};
+  const a = CHAR_ART[id] || CHAR_ART.player;
+  const pose = opt.pose || 'stand';
+  const phase = opt.phase || 0;
+  const look = opt.look || 0;
+  const blink = opt.blink || false;
+  c.save();
+  c.translate(x, y);
+  if (opt.flip) c.scale(-1, 1);
+  /* gold rim-light shadow */
+  c.fillStyle = 'rgba(0,0,0,0.28)';
+  c.beginPath(); c.ellipse(0, 1.5 * s, 14 * s, 3.4 * s, 0, 0, 7); c.fill();
+  drawTorso(c, a, s, phase, pose);
+  drawHead(c, a, s, blink, look);
+  c.restore();
+}
+
+/* ---- faceTime window (Sam) ---- */
+function drawFaceTime(c, x, y, w, h, t) {
+  c.save();
+  rr(c, x, y, w, h, 6); c.clip();
+  c.fillStyle = '#121826'; c.fillRect(x, y, w, h);
+  const s = w / 90;
+  drawFigure(c, 'sam', x + w * 0.5, y + h * 0.96, s * 1.15, { pose: 'stand', look: Math.sin(t * 0.9) });
+  /* goblin merch bouncing */
+  const gy = y + h - 26 * s * 1.15 - Math.abs(Math.sin(t * 3)) * 8;
+  c.fillStyle = '#3f7d4e';
+  c.beginPath(); c.arc(x + w * 0.18, gy, 9, 0, 7); c.fill();
+  c.fillStyle = '#fff'; c.font = 'bold 10px Georgia'; c.textAlign = 'center';
+  c.fillText('DOTS', x + w * 0.18, gy + 4);
+  c.fillStyle = '#0c0e12'; rr(c, x + w * 0.62, y + 8, 26, 14, 3); c.fill();
+  c.fillStyle = '#e8c96a'; c.font = 'bold 9px monospace';
+  c.fillText('LIVE', x + w * 0.62 + 13, y + 18);
+  c.restore();
+  c.strokeStyle = '#3a4f7a'; c.lineWidth = 2;
+  rr(c, x, y, w, h, 6); c.stroke();
+}
+
+/* ==================== mini.js ==================== */
+/* ==================== mini.js — six micro-games (no falling orbs) ==================== */
+
+let mini = null;   // { id, t, elapsed, done, success, residue, toast, title, how, time }
+
+function startMini(id) {
+  const def = MINI[id];
+  mini = { id: id, t: 0, elapsed: 0, done: false, success: false, residue: null, toast: '', title: def.title, how: def.how, time: def.time };
+  def.init();
+}
+function finishMini(success, residue, toast) {
+  mini.success = success; mini.residue = residue || {}; mini.toast = toast || ''; mini.done = true;
+}
+
+/* ---- shared chrome ---- */
+function drawMiniShell(c, W, H, t) {
+  c.fillStyle = 'rgba(7,10,18,0.72)'; c.fillRect(0, 0, W, H);
+  const pw = Math.min(760, W * 0.72), ph = Math.min(430, H * 0.72);
+  const px = (W - pw) / 2, py = (H - ph) / 2;
+  c.fillStyle = PAL.cream; rr(c, px, py, pw, ph, 10); c.fill();
+  c.strokeStyle = PAL.gold; c.lineWidth = 2.5; rr(c, px, py, pw, ph, 10); c.stroke();
+  c.fillStyle = PAL.ink; c.font = 'bold 21px Georgia, serif'; c.textAlign = 'left';
+  c.fillText(mini.title, px + 24, py + 38);
+  c.fillStyle = '#5a4a38'; c.font = '14px Georgia, serif';
+  c.fillText(mini.how, px + 24, py + 60);
+  /* time bar */
+  const frac = 1 - Math.min(1, mini.elapsed / mini.time);
+  c.fillStyle = '#d9cfae'; rr(c, px + 24, py + ph - 26, pw - 48, 10, 5); c.fill();
+  c.fillStyle = frac > 0.3 ? PAL.green : PAL.red; rr(c, px + 24, py + ph - 26, (pw - 48) * frac, 10, 5); c.fill();
+  return { px: px, py: py, pw: pw, ph: ph };
+}
+
+const MINI = {
+  /* ---- ELON: phone composer ---- */
+  phone: {
+    title: 'ELON’S PHONE — post the thing',
+    how: 'Click a draft, then POST. One of these is a bad idea.',
+    time: 16,
+    init() { mini.drafts = ['Banger.', 'Grading each other’s homework. Morally.', 'Dots are here. Wait—'], mini.picked = -1, mini.likes = 0, mini.posted = false; },
+    tick(dt) {
+      mini.t += dt;
+      if (mini.posted) { mini.elapsed += dt * 0.2; return; }
+      mini.elapsed += dt;
+      if (mini.elapsed > mini.time) { finishMini(false, { meme:+1, drama:+1 }, 'The phone slept. PR is monitoring the situation.'); return; }
+      for (let i = 0; i < 3; i++) {
+        const r = miniRects['draft' + i];
+        if (r && hitTest(r) && CLICKS.length) { CLICKS.pop(); mini.picked = i; break; }
+      }
+      if (mini.picked >= 0) {
+        const r = miniRects['post'];
+        if (r && hitTest(r) && CLICKS.length) {
+          CLICKS.pop(); mini.posted = true;
+          const bad = mini.picked === 2;
+          if (bad) finishMini(false, { meme:+1, drama:+1 }, '“Dots are here.” That was Sam’s line. PR is monitoring the situation.');
+          else finishMini(true, { meme:+2, optics:+1 }, 'Posted. The internet finds it before dessert.');
+        }
+      }
+    },
+    draw(c, t) {
+      const b = drawMiniShell(c, W, H, t);
+      /* phone */
+      const cx = b.px + 120, cy = b.py + 90;
+      c.fillStyle = '#0c0e12'; rr(c, cx, cy, 150, 250, 18); c.fill();
+      c.fillStyle = '#eef0f4'; rr(c, cx + 8, cy + 8, 134, 234, 12); c.fill();
+      c.fillStyle = '#8899aa'; c.font = '9px monospace'; c.textAlign = 'left';
+      c.fillText('X · POST', cx + 16, cy + 24);
+      for (let i = 0; i < 3; i++) {
+        const dy = cy + 38 + i * 62;
+        const r = { x: cx + 14, y: dy, w: 122, h: 54 };
+        miniRects['draft' + i] = r;
+        c.fillStyle = mini.picked === i ? '#d8e4f4' : '#fff';
+        rr(c, r.x, r.y, r.w, r.h, 6); c.fill();
+        c.strokeStyle = mini.picked === i ? '#3a6ea5' : '#c8c8c8'; c.lineWidth = 1.5; rr(c, r.x, r.y, r.w, r.h, 6); c.stroke();
+        c.fillStyle = '#22262c'; c.font = 'italic 10.5px Georgia';
+        wrapText(c, mini.drafts[i], r.x + 8, r.y + 16, r.w - 16, 13);
+      }
+      const pr = { x: cx + 14, y: cy + 226, w: 122, h: 16 };
+      miniRects['post'] = pr;
+      c.fillStyle = mini.picked >= 0 ? '#1d9bf0' : '#9aa4b0';
+      rr(c, pr.x, pr.y, pr.w, pr.h, 8); c.fill();
+      c.fillStyle = '#fff'; c.font = 'bold 10px monospace'; c.textAlign = 'center';
+      c.fillText(mini.picked >= 0 ? 'POST' : 'PICK A DRAFT', pr.x + pr.w / 2, pr.y + 11);
+      /* Elon watching */
+      drawFigure(c, 'musk', b.px + b.pw - 120, b.py + b.ph - 40, 1.35, { pose: 'stand', look: Math.sin(t * 1.4) });
+      c.fillStyle = '#5a4a38'; c.font = 'italic 13px Georgia, serif'; c.textAlign = 'center';
+      c.fillText(mini.posted ? '“Historic.”' : '“Probably.”', b.px + b.pw - 120, b.py + b.ph - 66);
+    }
+  },
+
+  /* ---- JENSEN: sand conveyor ---- */
+  sand: {
+    title: 'SAND → WAFER → GPU',
+    how: 'Drag the sand along the track. Hold it inside each station until it converts.',
+    time: 20,
+    init() { mini.sx = 0.06; mini.station = 0; mini.hold = 0; mini.stage = ['SAND', 'WAFER', 'GPU']; },
+    tick(dt) {
+      mini.t += dt; mini.elapsed += dt;
+      if (mini.elapsed > mini.time) { finishMini(false, { optics:-1 }, 'The sand stayed sand. Jensen nods anyway.'); return; }
+      if (MDOWN && MXY) {
+        const track = miniRects['track'];
+        if (track && MXY.x > track.x && MXY.x < track.x + track.w) {
+          mini.sx = (MXY.x - track.x) / track.w;
+        }
+      }
+      const zone = Math.min(2, Math.floor(mini.sx * 3));
+      const inZone = Math.abs(mini.sx - (zone + 0.5) / 3) < 0.16;
+      if (zone === mini.station && inZone && MDOWN) {
+        mini.hold += dt;
+        if (mini.hold > 1.6) { mini.hold = 0; mini.station++; if (mini.station > 2) { finishMini(true, { optics:+1, substance:+1 }, 'Sand to GPU. The vial glints. The jacket does the rest.'); } }
+      } else { mini.hold = Math.max(0, mini.hold - dt * 0.6); }
+    },
+    draw(c, t) {
+      const b = drawMiniShell(c, W, H, t);
+      const tx = b.px + 60, ty = b.py + 210, tw = b.pw - 120;
+      miniRects['track'] = { x: tx, y: ty - 30, w: tw, h: 60 };
+      c.fillStyle = '#2a2f3a'; rr(c, tx, ty - 30, tw, 60, 8); c.fill();
+      for (let i = 0; i < 3; i++) {
+        const zx = tx + tw * (i / 3), zw = tw / 3;
+        c.fillStyle = i === mini.station ? 'rgba(201,162,39,0.25)' : 'rgba(255,255,255,0.05)';
+        rr(c, zx + 3, ty - 27, zw - 6, 54, 6); c.fill();
+        c.fillStyle = i < mini.station ? PAL.gold : '#8892a0'; c.font = 'bold 13px monospace'; c.textAlign = 'center';
+        c.fillText(mini.stage[i], zx + zw / 2, ty + 44);
+      }
+      const gx = tx + tw * mini.sx;
+      /* the sand blob becomes a wafer becomes a GPU */
+      if (mini.station === 0) {
+        c.fillStyle = '#d9c07a';
+        c.beginPath(); c.ellipse(gx, ty, 13, 8, 0, 0, 7); c.fill();
+        c.fillStyle = '#b09a54'; c.beginPath(); c.ellipse(gx - 3, ty - 3, 5, 3, 0, 0, 7); c.fill();
+      } else if (mini.station === 1) {
+        c.fillStyle = '#cfd6de'; rr(c, gx - 14, ty - 9, 28, 18, 3); c.fill();
+        c.strokeStyle = '#8892a0'; c.lineWidth = 1; c.strokeRect(gx - 14, ty - 9, 28, 18);
+      } else {
+        c.fillStyle = '#1c3a2a'; rr(c, gx - 16, ty - 11, 32, 22, 3); c.fill();
+        c.fillStyle = PAL.gold; c.font = 'bold 9px monospace'; c.textAlign = 'center';
+        c.fillText('GPU', gx, ty + 4);
+      }
+      /* hold progress */
+      if (mini.hold > 0.05) {
+        c.fillStyle = PAL.gold; rr(c, tx, ty - 44, tw * (mini.hold / 1.6), 6, 3); c.fill();
+      }
+      drawFigure(c, 'huang', b.px + b.pw - 110, b.py + b.ph - 40, 1.3, { pose: 'stand' });
+      c.fillStyle = '#5a4a38'; c.font = 'italic 13px Georgia, serif'; c.textAlign = 'center';
+      c.fillText(mini.station === 0 ? '“Sand.”' : mini.station === 1 ? '“Wafer.”' : '“Software.”', b.px + b.pw - 110, b.py + b.ph - 66);
+    }
+  },
+
+  /* ---- ZUCK: caption tap ---- */
+  caption: {
+    title: 'META GLASSES — LIVE CAPTIONS',
+    how: 'Tap the WRONG words before they reach the jumbotron. Let the right ones through.',
+    time: 18,
+    init() {
+      mini.words = []; mini.spawn = 0; mini.wrongTapped = 0; mini.wrongMissed = 0; mini.jumbotron = [];
+      mini.pool = [
+        { t:'robust', w:false }, { t:'controls', w:false }, { t:'board', w:false }, { t:'reports', w:false },
+        { t:'morally', w:true }, { t:'bidding', w:true }, { t:'binder', w:true }, { t:'constitution', w:false },
+        { t:'monitoring', w:false }, { t:'morally', w:true }
+      ];
+    },
+    tick(dt) {
+      mini.t += dt; mini.elapsed += dt;
+      if (mini.elapsed > mini.time) {
+        const leaked = mini.wrongMissed + mini.wrongTapped;
+        if (leaked === 0) finishMini(true, { optics:+1 }, 'Captions clean. The jumbotron is disappointed.');
+        else finishMini(false, { drama:+1, }, 'One wrong caption is already on the jumbotron.');
+        if (mini.wrongMissed > 0) mini.residue.flag = null, stateFlags.zuckCaption = true;
+        return;
+      }
+      mini.spawn -= dt;
+      if (mini.spawn <= 0 && mini.words.length < 4) {
+        const w = mini.pool[Math.floor(RND() * mini.pool.length)];
+        mini.words.push({ t: w.t, wrong: w.w, x: -40, y: 0, speed: 42 + RND() * 26 });
+        mini.spawn = 0.55;
+      }
+      for (let i = mini.words.length - 1; i >= 0; i--) {
+        const wd = mini.words[i]; wd.x += wd.speed * dt;
+        const r = { x: wd.x - 34, y: 118 + wd.y, w: 68, h: 26 };
+        wd.rect = r;
+        if (hitTest(r) && CLICKS.length) { CLICKS.pop(); if (wd.wrong) mini.wrongTapped++; else mini.opticsHit = (mini.opticsHit || 0) + 1; mini.words.splice(i, 1); continue; }
+        if (wd.x > 430) {
+          if (wd.wrong) { mini.wrongMissed++; mini.jumbotron.push(wd.t); }
+          mini.words.splice(i, 1);
+        }
+      }
+    },
+    draw(c, t) {
+      const b = drawMiniShell(c, W, H, t);
+      /* jumbotron */
+      c.fillStyle = '#101826'; rr(c, b.px + 24, b.py + 78, b.pw - 48, 34, 4); c.fill();
+      c.strokeStyle = PAL.gold; c.lineWidth = 1.5; rr(c, b.px + 24, b.py + 78, b.pw - 48, 34, 4); c.stroke();
+      c.fillStyle = PAL.gold; c.font = 'bold 15px monospace'; c.textAlign = 'left';
+      c.fillText(mini.jumbotron.slice(-2).join(' · ') || '· · ·', b.px + 36, b.py + 101);
+      /* streaming words */
+      for (const wd of mini.words) {
+        const r = wd.rect;
+        c.fillStyle = '#fff'; rr(c, r.x, r.y, r.w, r.h, 13); c.fill();
+        c.strokeStyle = '#c8c0a8'; c.lineWidth = 1.2; rr(c, r.x, r.y, r.w, r.h, 13); c.stroke();
+        c.fillStyle = '#22262c'; c.font = '13px Georgia'; c.textAlign = 'center';
+        c.fillText(wd.t, r.x + r.w / 2, r.y + 17);
+      }
+      /* zuck wearing the glasses, watching */
+      drawFigure(c, 'zuck', b.px + b.pw - 110, b.py + b.ph - 40, 1.3, { pose: 'stand', look: Math.sin(t * 0.8) });
+      c.fillStyle = '#5a4a38'; c.font = 'italic 13px Georgia, serif'; c.textAlign = 'center';
+      c.fillText('“Robust.”', b.px + b.pw - 110, b.py + b.ph - 66);
+      c.fillStyle = '#5a4a38'; c.font = '12px Georgia'; c.textAlign = 'left';
+      c.fillText('tapped: ' + mini.wrongTapped + '   leaked: ' + mini.wrongMissed, b.px + 24, b.py + b.ph - 40);
+    }
+  },
+
+  /* ---- SUNDAR: stamp folders ---- */
+  stamp: {
+    title: 'MODEL FOLDERS — REVIEW, THEN RELEASE',
+    how: 'Click each folder when the stamp is inside it. Miss and it ships unstamped.',
+    time: 16,
+    init() { mini.folders = [0, 1, 2].map(() => ({ stamped: false })); mini.marker = 0; mini.dir = 1; },
+    tick(dt) {
+      mini.t += dt; mini.elapsed += dt;
+      if (mini.elapsed > mini.time) {
+        const done = mini.folders.filter(f => f.stamped).length;
+        finishMini(done === 3, done === 3 ? { substance:+2 } : { optics:-1 },
+          done === 3 ? 'REVIEWED. Official. In the minutes now.' : done + ' of 3 shipped. Somewhere, a lawyer opens a tab.');
+        return;
+      }
+      mini.marker += mini.dir * dt * 0.85;
+      if (mini.marker > 1 || mini.marker < 0) { mini.dir *= -1; mini.marker = Math.max(0, Math.min(1, mini.marker)); }
+      for (let i = 0; i < 3; i++) {
+        const r = miniRects['folder' + i];
+        if (r && hitTest(r) && CLICKS.length && !mini.folders[i].stamped) {
+          CLICKS.pop();
+          const inZone = (i % 2 === 0 ? mini.marker > 0.62 : mini.marker < 0.38);
+          mini.folders[i].stamped = inZone; mini.folders[i].missed = !inZone;
+        }
+      }
+      if (mini.folders.every(f => f.stamped)) {
+        finishMini(true, { substance:+2, optics:+1 }, 'REVIEWED ×3. The lunch feels official and slightly dead.');
+      }
+    },
+    draw(c, t) {
+      const b = drawMiniShell(c, W, H, t);
+      for (let i = 0; i < 3; i++) {
+        const fx = b.px + 70 + i * 190, fy = b.py + 150, fw = 120, fh = 150;
+        const r = { x: fx, y: fy, w: fw, h: fh };
+        miniRects['folder' + i] = r;
+        c.fillStyle = '#e0d4ae'; rr(c, fx, fy, fw, fh, 6); c.fill();
+        c.strokeStyle = '#b8a878'; c.lineWidth = 2; rr(c, fx, fy, fw, fh, 6); c.stroke();
+        c.fillStyle = '#8a7a54'; c.font = 'bold 11px monospace'; c.textAlign = 'center';
+        c.fillText('MODEL-' + (i + 1), fx + fw / 2, fy + 24);
+        c.fillStyle = '#b8a878'; c.font = '9px monospace';
+        c.fillText('auto-ship in ' + Math.max(0, Math.ceil(mini.time - mini.elapsed)) + 's', fx + fw / 2, fy + 40);
+        if (mini.folders[i].stamped) {
+          c.save(); c.translate(fx + fw / 2, fy + 92); c.rotate(-0.12);
+          c.strokeStyle = '#2a5a8a'; c.lineWidth = 3; rr(c, -34, -14, 68, 28, 4); c.stroke();
+          c.fillStyle = '#2a5a8a'; c.font = 'bold 14px monospace';
+          c.fillText('REVIEWED', 0, 5); c.restore();
+        } else if (mini.folders[i].missed) {
+          c.fillStyle = '#a05a4a'; c.font = 'italic 11px Georgia';
+          c.fillText('shipped unstamped', fx + fw / 2, fy + 96);
+        }
+      }
+      /* the stamp marker: two green zones at the ends */
+      const mx = b.px + 70 + mini.marker * (b.pw - 190);
+      c.fillStyle = PAL.green; rr(c, mx - 26, b.py + 108, 52, 24, 4); c.fill();
+      c.fillStyle = '#fff'; c.font = 'bold 10px monospace'; c.textAlign = 'center';
+      c.fillText('STAMP', mx, b.py + 124);
+      drawFigure(c, 'pichai', b.px + b.pw - 60, b.py + b.ph - 36, 1.0, { pose: 'stand' });
+    }
+  },
+
+  /* ---- DARIO: safety slider ---- */
+  slider: {
+    title: 'HOLD THE SAFETY SLIDER',
+    how: 'Drag SAFETY up. SPEED fights you. Keep it above the line.',
+    time: 15,
+    init() { mini.safety = 0.5; mini.held = 0; },
+    tick(dt) {
+      mini.t += dt; mini.elapsed += dt;
+      if (mini.elapsed > mini.time) {
+        finishMini(false, { substance:+1 }, 'SPEED won. “The frosting is not the cake.”');
+        return;
+      }
+      if (MDOWN && MXY) {
+        const track = miniRects['strack'];
+        if (track && MXY.x > track.x - 20 && MXY.x < track.x + track.w + 20) {
+          mini.safety = Math.max(0, Math.min(1, 1 - (MXY.y - track.y) / track.h));
+        }
+      }
+      mini.safety -= dt * (0.14 + 0.10 * Math.sin(mini.t * 2.2));   // SPEED fights you
+      if (mini.safety > 0.62) mini.held += dt; else mini.held = Math.max(0, mini.held - dt * 0.5);
+      if (mini.held > 6) finishMini(true, { substance:+3, rapport:-2 }, 'The testing held. Trump noticed. That is not always good.');
+    },
+    draw(c, t) {
+      const b = drawMiniShell(c, W, H, t);
+      const tx = b.px + 150, ty = b.py + 100, tw = 60, th = 220;
+      miniRects['strack'] = { x: tx, y: ty, w: tw, h: th };
+      c.fillStyle = '#2a2f3a'; rr(c, tx, ty, tw, th, 8); c.fill();
+      /* red speed gradient bottom */
+      const grad = c.createLinearGradient(0, ty + th, 0, ty);
+      grad.addColorStop(0, 'rgba(192,57,43,0.55)'); grad.addColorStop(1, 'rgba(192,57,43,0)');
+      c.fillStyle = grad; rr(c, tx, ty, tw, th, 8); c.fill();
+      /* the line */
+      c.strokeStyle = PAL.gold; c.setLineDash([5, 4]); c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(tx - 12, ty + th * 0.38); c.lineTo(tx + tw + 12, ty + th * 0.38); c.stroke();
+      c.setLineDash([]);
+      c.fillStyle = '#8892a0'; c.font = '10px monospace'; c.textAlign = 'right';
+      c.fillText('SPEED →', tx + tw - 6, ty + th - 8);
+      /* the safety knob */
+      const ky = ty + th * (1 - mini.safety);
+      c.fillStyle = mini.safety > 0.62 ? PAL.green : PAL.red;
+      rr(c, tx + 4, ky - 11, tw - 8, 22, 6); c.fill();
+      c.fillStyle = '#fff'; c.font = 'bold 10px monospace'; c.textAlign = 'center';
+      c.fillText('SAFETY', tx + tw / 2, ky + 4);
+      /* progress */
+      c.fillStyle = PAL.gold; rr(c, b.px + 250, b.py + 100, 14 * (mini.held / 6), 220, 4); c.fill();
+      c.fillStyle = '#5a4a38'; c.font = '12px monospace'; c.textAlign = 'left';
+      c.fillText(Math.ceil(mini.held) + 's / 6s held', b.px + 250, b.py + 340);
+      drawFigure(c, 'amodei', b.px + b.pw - 110, b.py + b.ph - 40, 1.3, { pose: 'stand' });
+      c.fillStyle = '#5a4a38'; c.font = 'italic 13px Georgia, serif'; c.textAlign = 'center';
+      c.fillText('“Actual ones.”', b.px + b.pw - 110, b.py + b.ph - 66);
+    }
+  },
+
+  /* ---- GREG: pen on the line ---- */
+  pen: {
+    title: 'KEEP THE PEN ON THE LINE',
+    how: 'Hold the mouse button and keep the nib inside the wobbling signature line.',
+    time: 15,
+    init() { mini.off = 0; mini.on = 0; mini.wob = 0; },
+    tick(dt) {
+      mini.t += dt; mini.elapsed += dt;
+      if (mini.elapsed > mini.time) {
+        finishMini(false, { drama:+1 }, 'The nib wandered. The line is technically a squiggle.');
+        return;
+      }
+      mini.wob += dt;
+      if (MDOWN && MXY) {
+        const lane = miniRects['lane'];
+        if (lane) {
+          const yMid = lane.y + lane.h / 2 + Math.sin(mini.wob * 2.4) * 26;
+          mini.off = Math.abs(MXY.y - yMid);
+        }
+      }
+      if (MDOWN && mini.off < 18) mini.on += dt; else mini.on = Math.max(0, mini.on - dt * 0.7);
+      if (mini.on > 8) finishMini(true, { optics:+1, drama:-1 }, 'The pen held the line. Greg exhales for the first time today.');
+    },
+    draw(c, t) {
+      const b = drawMiniShell(c, W, H, t);
+      const lx = b.px + 50, lw = b.pw - 100, ly = b.py + 200, lh = 90;
+      miniRects['lane'] = { x: lx, y: ly, w: lw, h: lh };
+      /* document */
+      c.fillStyle = '#faf6ea'; rr(c, lx - 10, ly - 40, lw + 20, lh + 60, 4); c.fill();
+      c.strokeStyle = '#d8cba0'; c.lineWidth = 1.5; rr(c, lx - 10, ly - 40, lw + 20, lh + 60, 4); c.stroke();
+      /* wobbling signature line */
+      const yMid = ly + lh / 2 + Math.sin(mini.wob * 2.4) * 26;
+      c.strokeStyle = '#2a2f3a'; c.lineWidth = 2.5;
+      c.beginPath(); c.moveTo(lx + 20, yMid); c.lineTo(lx + lw - 20, yMid); c.stroke();
+      c.fillStyle = '#8a7a54'; c.font = 'italic 12px Georgia'; c.textAlign = 'left';
+      c.fillText('Donald J. Trump — President of the Unites States', lx + 20, yMid - 18);
+      /* the pen follows the mouse x, nib at mouse y */
+      const px2 = MXY ? Math.max(lx + 20, Math.min(lx + lw - 20, MXY.x)) : lx + lw / 2;
+      const py2 = MXY ? MXY.y : yMid;
+      const onLine = MDOWN && mini.off < 18;
+      c.strokeStyle = onLine ? '#1a1a2e' : '#4a4a5a'; c.lineWidth = 4; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(px2 + 16, py2 - 40); c.lineTo(px2, py2); c.stroke();
+      c.fillStyle = PAL.gold;
+      c.beginPath(); c.arc(px2, py2, 3.4, 0, 7); c.fill();
+      /* progress */
+      c.fillStyle = PAL.green; rr(c, lx, ly + lh + 34, lw * (mini.on / 8), 8, 4); c.fill();
+      /* sam faceTiming in, goblin merch yelling */
+      drawFaceTime(c, b.px + b.pw - 200, b.py + 70, 150, 100, t);
+      c.fillStyle = '#5a4a38'; c.font = 'italic 13px Georgia, serif'; c.textAlign = 'center';
+      c.fillText(mini.on > 4 ? '“…ignore the merch.”' : '“DOTS ARE HERE.”', b.px + b.pw - 125, b.py + 190);
+    }
+  }
+};
+
+/* micro-game rect registry, cleared each frame */
+let miniRects = {};
+
+/* ==================== scenes.js ==================== */
+/* ==================== scenes.js — title, cast, room, talk, sign, gaggle, end ==================== */
+
+/* ---- shared East Room background ---- */
+function drawEastRoomBg(c, t, variant) {
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#0b1220'); g.addColorStop(0.55, '#16233c'); g.addColorStop(1, '#1d2f4d');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  /* wainscoting */
+  c.fillStyle = '#141d30'; c.fillRect(0, 330, W, H - 330);
+  c.fillStyle = '#1a2740'; c.fillRect(0, 330, W, 8);
+  for (let x = 10; x < W; x += 64) { c.fillStyle = 'rgba(232,201,106,0.06)'; c.fillRect(x, 346, 2, 120); }
+  /* chandelier with bloom */
+  const chx = W / 2, chy = 74 + Math.sin(t * 0.6) * 3;
+  const bloom = c.createRadialGradient(chx, chy, 4, chx, chy, 150);
+  bloom.addColorStop(0, 'rgba(244,227,161,0.5)'); bloom.addColorStop(1, 'rgba(244,227,161,0)');
+  c.fillStyle = bloom; c.fillRect(chx - 160, chy - 100, 320, 260);
+  c.strokeStyle = '#c9a227'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(chx, 0); c.lineTo(chx, chy - 34); c.stroke();
+  c.beginPath(); c.ellipse(chx, chy, 52, 15, 0, 0, 7); c.stroke();
+  c.beginPath(); c.ellipse(chx, chy - 16, 30, 10, 0, 0, 7); c.stroke();
+  for (let i = -2; i <= 2; i++) {
+    c.fillStyle = '#f4e3a1';
+    c.beginPath(); c.arc(chx + i * 22, chy + 2 + Math.abs(i) * 5, 3.4, 0, 7); c.fill();
+  }
+  /* gold curtains, drifting */
+  for (const side of [0, 1]) {
+    const cx = side ? W - 130 : 0;
+    const drift = Math.sin(t * 0.4 + side * 2) * 4;
+    c.fillStyle = '#7a1f1f';
+    c.beginPath();
+    c.moveTo(cx + drift, 0);
+    c.bezierCurveTo(cx + 90 + drift, H * 0.3, cx + 30 + drift, H * 0.7, cx + 70 + drift, H);
+    c.lineTo(cx + (side ? 130 : -20) + drift, H);
+    c.bezierCurveTo(cx + (side ? 60 : 60) + drift, H * 0.6, cx + (side ? 110 : 20) + drift, H * 0.25, cx + (side ? 130 : -20), 0);
+    c.closePath(); c.fill();
+    c.fillStyle = 'rgba(201,162,39,0.22)';
+    for (let i = 0; i < 4; i++) c.fillRect(cx + 12 + i * 22 + drift, 0, 5, H);
+  }
+  /* tall windows with protest dots outside */
+  for (const wx of [170, W - 300]) {
+    c.fillStyle = '#0e1830';
+    rr(c, wx, 96, 130, 220, 4); c.fill();
+    c.strokeStyle = '#c9a227'; c.lineWidth = 3; rr(c, wx, 96, 130, 220, 4); c.stroke();
+    c.beginPath(); c.moveTo(wx + 65, 96); c.lineTo(wx + 65, 316); c.moveTo(wx, 206); c.lineTo(wx + 130, 206); c.stroke();
+    /* night outside */
+    c.fillStyle = 'rgba(232,201,106,0.05)';
+    c.beginPath(); c.arc(wx + 30, 140, 16, 0, 7); c.fill();
+    /* protest dots bobbing */
+    c.fillStyle = '#e8c96a';
+    for (let i = 0; i < 7; i++) {
+      const px2 = wx + 18 + i * 16, py2 = 268 + Math.sin(t * 2 + i * 1.7) * 4;
+      c.beginPath(); c.arc(px2, py2, 2.6, 0, 7); c.fill();
+    }
+  }
+}
+
+/* ---- long table + placards ---- */
+const SEATS = [
+  { id:'brockman', x: 0.06 },
+  { id:'pichai',   x: 0.22 },
+  { id:'zuck',     x: 0.38 },
+  { id:'trump',    x: 0.52 },
+  { id:'huang',    x: 0.66 },
+  { id:'musk',     x: 0.80 },
+  { id:'amodei',   x: 0.94 }
+];
+function drawTable(c, t) {
+  /* carpet */
+  const cg = c.createLinearGradient(0, 560, 0, H);
+  cg.addColorStop(0, '#5d1327'); cg.addColorStop(1, '#2e0a16');
+  c.fillStyle = cg; c.fillRect(0, 560, W, H - 560);
+  c.fillStyle = 'rgba(201,162,39,0.5)'; c.fillRect(0, 560, W, 5);
+  c.fillStyle = 'rgba(201,162,39,0.14)';
+  for (let x = 0; x < W; x += 90) c.fillRect(x, 566, 45, H - 566);
+  /* table top */
+  c.fillStyle = PAL.wood2;
+  rr(c, -20, 470, W + 40, 92, 6); c.fill();
+  c.fillStyle = PAL.wood3; rr(c, -20, 470, W + 40, 14, 4); c.fill();
+  c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(-20, 552, W + 40, 10);
+  /* gold runner */
+  c.fillStyle = 'rgba(201,162,39,0.4)'; c.fillRect(-20, 492, W + 40, 8);
+  /* placards + glasses of water */
+  for (const s of SEATS) {
+    const px2 = 60 + s.x * (W - 140);
+    c.fillStyle = PAL.cream; rr(c, px2 - 22, 452, 44, 15, 2); c.fill();
+    c.fillStyle = '#5a4a38'; c.font = 'bold 6.5px Georgia'; c.textAlign = 'center';
+    c.fillText(s.id === 'trump' ? 'THE PRESIDENT' : CAST.find(k => k.id === s.id).name.split(' ').pop().toUpperCase(), px2, 462);
+    c.fillStyle = 'rgba(200,220,240,0.75)';
+    rr(c, px2 + 28, 448, 9, 17, 2); c.fill();
+  }
+  /* chairs behind */
+  for (const s of SEATS) {
+    const px2 = 60 + s.x * (W - 140);
+    c.fillStyle = '#241a10';
+    rr(c, px2 - 26, 400, 52, 74, 8); c.fill();
+    c.fillStyle = 'rgba(201,162,39,0.25)'; rr(c, px2 - 20, 404, 40, 6, 3); c.fill();
+  }
+}
+
+/* ---- title ---- */
+function drawTitle(c, t) {
+  drawEastRoomBg(c, t, 'title');
+  drawTable(c, t);
+  /* tiny standing silhouettes */
+  for (let i = 0; i < 6; i++) {
+    const sx = 240 + i * 150 + Math.sin(t * 0.5 + i) * 3;
+    c.fillStyle = 'rgba(10,12,20,0.85)';
+    c.beginPath(); c.ellipse(sx, 428, 9, 26, 0, 0, 7); c.fill();
+    c.beginPath(); c.arc(sx, 394, 7, 0, 7); c.fill();
+  }
+  /* dusk vignette */
+  c.fillStyle = 'rgba(7,9,15,0.55)'; c.fillRect(0, 0, W, H);
+  /* title */
+  c.textAlign = 'center';
+  c.fillStyle = PAL.gold2;
+  c.font = '600 58px Georgia, serif';
+  c.fillText('WHITE HOUSE ACCORD', W / 2, 200);
+  c.fillStyle = PAL.cream;
+  c.font = 'italic 21px Georgia, serif';
+  c.fillText('Super Intelligence Signing Simulator', W / 2, 236);
+  c.fillStyle = 'rgba(245,239,221,0.55)';
+  c.font = '13px Georgia, serif';
+  c.fillText('East Room luncheon · September 29, 2026 · then the driveway gaggle', W / 2, 262);
+  /* buttons */
+  uiBtn(W / 2 - 110, 320, 220, 52, 'PLAY', 'PLAY', true);
+  uiBtn(W / 2 - 110, 386, 220, 44, 'CAST', 'CAST');
+  uiBtn(W / 2 - 110, 442, 220, 44, 'HOW', 'HOW TO PLAY');
+  c.fillStyle = 'rgba(245,239,221,0.35)'; c.font = '11px Georgia, serif';
+  c.fillText('A satire. Any resemblance to actual accords is purely tremendous.', W / 2, H - 22);
+}
+
+/* ---- cast ---- */
+function drawCast(c, t) {
+  c.fillStyle = PAL.dusk; c.fillRect(0, 0, W, H);
+  c.fillStyle = PAL.gold2; c.font = '600 30px Georgia, serif'; c.textAlign = 'center';
+  c.fillText('WHO ARE YOU AT THE TABLE?', W / 2, 52);
+  c.fillStyle = 'rgba(245,239,221,0.5)'; c.font = '13px Georgia, serif';
+  c.fillText('Six signatories. Your seat is already a choice.', W / 2, 76);
+  const cards = CAST.filter(k => k.starter || k.id === 'trump');
+  const rows = [cards.slice(0, 4), cards.slice(4)];
+  const cw = 226, chh = 232, gap = 20;
+  rows.forEach((row, ri) => {
+    const totalW = row.length * cw + (row.length - 1) * gap;
+    const x0 = (W - totalW) / 2;
+    const yR = 96 + ri * (chh + 18);
+    row.forEach((k, i) => {
+    const x = x0 + i * (cw + gap), y = yR;
+    const isLocked = !!k.locked && !UNLOCKED.trump;
+    const hot2 = !isLocked && MX > x && MX < x + cw && MY > y && MY < y + chh;
+    c.fillStyle = hot2 ? '#1d2f4d' : '#16233c';
+    rr(c, x, y, cw, chh, 10); c.fill();
+    c.strokeStyle = hot2 ? PAL.gold : '#26365a'; c.lineWidth = hot2 ? 2.5 : 1.5;
+    rr(c, x, y, cw, chh, 10); c.stroke();
+    /* portrait medallion */
+    c.fillStyle = '#0e1830';
+    c.beginPath(); c.arc(x + cw / 2, y + 62, 40, 0, 7); c.fill();
+    c.strokeStyle = PAL.gold; c.lineWidth = 2; c.beginPath(); c.arc(x + cw / 2, y + 62, 40, 0, 7); c.stroke();
+    c.save();
+    c.beginPath(); c.arc(x + cw / 2, y + 62, 38, 0, 7); c.clip();
+    drawFigure(c, k.id, x + cw / 2, y + 108, 0.9, { pose: 'stand' });
+    c.restore();
+    c.fillStyle = PAL.gold2; c.font = 'bold 15px Georgia, serif'; c.textAlign = 'center';
+    c.fillText(k.name, x + cw / 2, y + 128);
+    c.fillStyle = '#9db2cc'; c.font = '11px Georgia, serif';
+    c.fillText(k.co, x + cw / 2, y + 145);
+    c.fillStyle = '#c9d4e6'; c.font = 'italic 11px Georgia, serif';
+    wrapText(c, k.quote, x + 16, y + 163, cw - 32, 12);
+    /* seat tell */
+    const st = STARTS[k.id];
+    c.fillStyle = 'rgba(232,201,106,0.8)'; c.font = '10px Georgia, serif';
+    c.fillText(st && st.toast ? st.toast.split('.')[0] + '.' : '', x + cw / 2, y + 196);
+    /* click START */
+    if (isLocked) {
+      c.fillStyle = 'rgba(16,20,28,0.7)'; rr(c, x + cw / 2 - 46, y + 200, 92, 26, 8); c.fill();
+      c.fillStyle = 'rgba(245,239,221,0.5)'; c.font = '10px Georgia, serif'; c.textAlign = 'center';
+      c.fillText('LOCKED', x + cw / 2, y + 217);
+    } else {
+      uiBtn(x + cw / 2 - 46, y + 200, 92, 26, 'pick_' + k.id, 'START', hot2);
+    }
+    c.fillStyle = k.signed ? '#7ef0a8' : '#ffb4b4'; c.font = '8px Georgia, serif';
+    c.fillText(k.signed ? 'SIGNED: YES' : 'SIGNED: NO', x + cw / 2, y + chh - 4);
+    });
+  });
+  uiBtn(W / 2 - 70, H - 44, 140, 34, 'back_title', 'BACK');
+}
+
+/* ---- how to play (4 lines max) ---- */
+function drawHow(c, t) {
+  c.fillStyle = PAL.dusk; c.fillRect(0, 0, W, H);
+  c.fillStyle = PAL.gold2; c.font = '600 30px Georgia, serif'; c.textAlign = 'center';
+  c.fillText('HOW TO PLAY', W / 2, 130);
+  c.fillStyle = PAL.cream; c.font = '16px Georgia, serif';
+  const lines = [
+    'A/D or arrows to walk the table. Click a person to talk.',
+    'Talk to three people. Each talk ends in their micro-game.',
+    'Then the signing. You become Trump. One typo. Three choices.',
+    'Rapport only flavors the ending. The story is the score.'
+  ];
+  lines.forEach((l, i) => c.fillText(l, W / 2, 190 + i * 36));
+  uiBtn(W / 2 - 70, H - 90, 140, 36, 'back_title', 'BACK');
+}
+
+/* ---- THE ROOM (playable) ---- */
+function drawRoom(c, t, dt) {
+  /* camera eases toward the player */
+  const target = G.playerX * W - W / 2;
+  cam += (target - cam) * Math.min(1, dt * 3);
+  cam = Math.max(-W * 0.18, Math.min(W * 0.18, cam));
+  c.save();
+  c.translate(-cam * 0.5, 0);
+  drawEastRoomBg(c, t, 'room');
+  c.restore();
+  c.save();
+  c.translate(-cam, 0);
+  drawTable(c, t);
+  /* ambient walkers: Sacks, Karp, Johnson, Vance, Bezos, Lisa passing + Tom Brown at the far end */
+  const walkers = [
+    { id:'sacks', x: 40,  y: 640 },
+    { id:'karp',  x: 130, y: 648 },
+    { id:'vance', x: 1180, y: 644 },
+    { id:'bezos', x: 1230, y: 640 },
+    { id:'johnson', x: 1120, y: 646 },
+    { id:'lisa',  x: 640 + Math.sin(t * 0.22) * 420, y: 636 },
+    { id:'tombrown', x: 1262, y: 644, talk: true }
+  ];
+  for (const wd of walkers) {
+    drawFigure(c, wd.id, wd.x, wd.y, 1.15, { pose: 'stand', look: Math.sin(t * 0.7 + wd.x) });
+    if (wd.talk) {
+      HOTRECTS.push({ x: wd.x - 30, y: wd.y - 130, w: 60, h: 140, id: 'npc_tombrown' });
+      const near = Math.abs(G.playerX * W - wd.x) < 80;
+      if (near && G.screen === 'room' && G.talksDone.indexOf('tombrown') === -1) {
+        c.fillStyle = 'rgba(245,239,221,0.92)';
+        rr(c, wd.x - 44, wd.y - 158, 88, 22, 11); c.fill();
+        c.fillStyle = '#101b2d'; c.font = 'bold 10px Georgia'; c.textAlign = 'center';
+        c.fillText('TALK', wd.x, wd.y - 143);
+      }
+    }
+  }
+  /* seated signers */
+  for (const s of SEATS) {
+    if (s.id === G.playerId) continue;
+    const px2 = 60 + s.x * (W - 140);
+    const isTrump = s.id === 'trump';
+    const talked = G.talksDone.indexOf(s.id) !== -1;
+    drawFigure(c, s.id, px2, 500, 1.6, {
+      pose: isTrump ? 'point' : 'sit',
+      look: Math.max(-1, Math.min(1, (G.playerX * W - px2) / 200)),
+      blink: Math.sin(t * 0.9 + s.x * 9) > 0.985
+    });
+    /* talked badge */
+    if (talked && !isTrump) {
+      c.fillStyle = PAL.green;
+      c.beginPath(); c.arc(px2 + 24, 420, 7, 0, 7); c.fill();
+      c.fillStyle = '#fff'; c.font = 'bold 9px Georgia'; c.textAlign = 'center';
+      c.fillText('✓', px2 + 24, 423);
+    }
+    /* interaction hit rect: includes the TALK bubble above the head + proximity hint */
+    const r = { x: px2 - 34, y: 262, w: 68, h: 258 };
+    HOTRECTS.push({ x: r.x, y: r.y, w: r.w, h: r.h, id: 'npc_' + s.id, npc: s.id });
+    const near = Math.abs(G.playerX * W - px2) < 80;
+    if (near && G.screen === 'room') {
+      c.fillStyle = 'rgba(245,239,221,0.92)';
+      rr(c, px2 - 44, 276, 88, 22, 11); c.fill();
+      c.fillStyle = '#101b2d'; c.font = 'bold 10px Georgia'; c.textAlign = 'center';
+      c.fillText(isTrump ? (G.talksDone.length >= 3 ? 'THE DESK' : 'AT THE SIGNING') : (talked ? 'AGAIN' : 'TALK'), px2, 291);
+    }
+  }
+  /* press cameras in the dark */
+  for (let i = 0; i < 3; i++) {
+    const cx2 = 200 + i * 380 + Math.sin(t * 0.3 + i * 2) * 14;
+    c.fillStyle = '#0a0c12';
+    rr(c, cx2, 588, 54, 30, 4); c.fill();
+    rr(c, cx2 + 16, 574, 22, 16, 3); c.fill();
+    c.fillStyle = '#1a2030';
+    c.beginPath(); c.arc(cx2 + 27, 582, 6, 0, 7); c.fill();
+    /* flash bursts */
+    const fl = Math.sin(t * 1.7 + i * 2.4);
+    if (fl > 0.93) {
+      const fg = c.createRadialGradient(cx2 + 27, 582, 2, cx2 + 27, 582, 60);
+      fg.addColorStop(0, 'rgba(255,255,255,0.75)'); fg.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = fg; c.fillRect(cx2 - 40, 530, 140, 120);
+    }
+  }
+  /* the player */
+  const pxx = G.playerX * W;
+  const walking = Math.abs(G.vx) > 4;
+  G.walkPhase = walking ? G.walkPhase + Math.abs(G.vx) * 0.045 : 0;
+  drawFigure(c, 'player', pxx, 662, 1.5, {
+    pose: walking ? 'walk' : 'stand',
+    phase: G.walkPhase,
+    flip: G.vx < -4,
+    look: Math.sin(t * 0.8) * 0.5,
+    blink: Math.sin(t * 1.1) > 0.99
+  });
+  c.restore();
+  drawHUD(c);
+}
+
+/* ---- HUD: exactly four things ---- */
+function drawHUD(c) {
+  /* 1. who you are + 2. rapport bar */
+  c.fillStyle = 'rgba(7,10,18,0.66)';
+  rr(c, 14, 14, 240, 46, 8); c.fill();
+  c.fillStyle = PAL.cream; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'left';
+  c.fillText('YOU ARE: ' + CAST.find(k => k.id === G.playerId).name.toUpperCase(), 26, 32);
+  const frac = G.ledger.rapport / 100;
+  c.fillStyle = 'rgba(245,239,221,0.16)'; rr(c, 26, 42, 216, 8, 4); c.fill();
+  c.fillStyle = PAL.gold; rr(c, 26, 42, 216 * frac, 8, 4); c.fill();
+  c.fillStyle = 'rgba(245,239,221,0.55)'; c.font = '9px Georgia, serif';
+  c.fillText('RAPPORT', 26 + 216 * frac + 6, 49);
+  /* 3. objective */
+  const obj = G.talksDone.length >= 3
+    ? 'The pen is up. Walk to the President’s desk.'
+    : 'Objective: talk to 3 people at the table (' + G.talksDone.length + '/3)';
+  c.fillStyle = 'rgba(7,10,18,0.66)';
+  const tw = c.measureText(obj).width;
+  rr(c, W / 2 - 160, 14, 320, 26, 8); c.fill();
+  c.fillStyle = PAL.gold2; c.font = '12px Georgia, serif'; c.textAlign = 'center';
+  c.fillText(obj, W / 2, 31);
+  /* pause hint */
+  c.fillStyle = 'rgba(7,10,18,0.66)';
+  rr(c, W - 74, 14, 60, 26, 8); c.fill();
+  c.fillStyle = 'rgba(245,239,221,0.7)'; c.font = '11px Georgia, serif'; c.textAlign = 'center';
+  c.fillText('P = MENU', W - 44, 31);
+  /* toast: one at a time, dies */
+  if (G.toast && G.t - G.toast.born < 4.6) {
+    const a = Math.min(1, (4.6 - (G.t - G.toast.born)) / 1.2);
+    const lines2 = wrapTextLines(c, G.toast.t, W - 376);
+    const th2 = 20 * lines2.length + 20;
+    c.fillStyle = 'rgba(7,10,18,' + (0.78 * a) + ')';
+    rr(c, W - 348, H - th2 - 18, 334, th2, 8); c.fill();
+    c.strokeStyle = 'rgba(201,162,39,' + (0.5 * a) + ')'; c.lineWidth = 1; rr(c, W - 348, H - th2 - 18, 334, th2, 8); c.stroke();
+    c.fillStyle = 'rgba(245,239,221,' + a + ')';
+    c.font = '12.5px Georgia, serif'; c.textAlign = 'left';
+    lines2.forEach((l, i) => c.fillText(l, W - 334, H - th2 - 4 + 14 + i * 20));
+  }
+}
+
+/* ---- dialogue (talk) ---- */
+function drawTalk(c, t, dt) {
+  drawRoom(c, t, dt);
+  /* darken */
+  c.fillStyle = 'rgba(7,10,18,0.45)'; c.fillRect(0, 0, W, H);
+  const tk = G.talk;
+  const who = CAST.find(k => k.id === tk.id);
+  const panelW = 560, panelH = 190, px2 = 60, py2 = H - panelH - 30;
+  c.fillStyle = PAL.cream; rr(c, px2, py2, panelW, panelH, 10); c.fill();
+  c.strokeStyle = PAL.gold; c.lineWidth = 2.5; rr(c, px2, py2, panelW, panelH, 10); c.stroke();
+  /* speaker */
+  c.fillStyle = PAL.ink; c.font = 'bold 16px Georgia, serif'; c.textAlign = 'left';
+  c.fillText(who.name.toUpperCase() + ' — ' + who.co, px2 + 22, py2 + 34);
+  /* lines so far, current line typed */
+  c.font = 'italic 14.5px Georgia, serif';
+  const shown = tk.lines.slice(0, tk.lineIdx + 1);
+  const cur = shown[shown.length - 1] || '';
+  const typed = cur.slice(0, Math.floor(tk.typeT * 34));
+  let yy = py2 + 62;
+  shown.slice(0, -1).forEach(l => { c.fillStyle = 'rgba(16,20,28,0.45)'; wrapText(c, l, px2 + 22, yy, panelW - 44); yy += 19 * wrapCount(c, l, panelW - 44); });
+  c.fillStyle = PAL.ink;
+  wrapText(c, typed + (Math.sin(t * 6) > 0 ? '|' : ''), px2 + 22, yy, panelW - 44, 17);
+  /* choices or advance */
+  const allShown = tk.lineIdx >= tk.lines.length - 1 && tk.typeT * 34 >= cur.length;
+  if (!allShown) {
+    c.fillStyle = 'rgba(16,20,28,0.5)'; c.font = '11px Georgia, serif';
+    c.fillText('click to continue', px2 + panelW - 130, py2 + panelH - 14);
+  }
+  if (tk.phase === 'replies') {
+    tk.replies.forEach((rep, i) => {
+      const bw2 = (panelW - 56) / 2, bx2 = px2 + 22 + i * (bw2 + 12), by2 = py2 + panelH - 62;
+      const hot2 = MX > bx2 && MX < bx2 + bw2 && MY > by2 && MY < by2 + 44;
+      c.fillStyle = hot2 ? '#16233c' : '#1d2f4d';
+      rr(c, bx2, by2, bw2, 44, 8); c.fill();
+      c.strokeStyle = hot2 ? PAL.gold : '#3a4a68'; c.lineWidth = hot2 ? 2.5 : 1.5;
+      rr(c, bx2, by2, bw2, 44, 8); c.stroke();
+      c.fillStyle = PAL.cream; c.font = '12.5px Georgia, serif'; c.textAlign = 'center';
+      wrapText(c, rep.t, bx2 + 10, by2 + 19, bw2 - 20, 14);
+      HOTRECTS.push({ x: bx2, y: by2, w: bw2, h: 44, id: 'reply_' + i });
+    });
+  }
+}
+
+/* ---- the signing: you become Trump ---- */
+function drawSign(c, t, dt) {
+  /* driveway warm light through windows */
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#1a1208'); g.addColorStop(0.5, '#2a1c0c'); g.addColorStop(1, '#0f0a06');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  /* warm lamps */
+  for (const lx of [180, W - 180]) {
+    const lg = c.createRadialGradient(lx, 120, 8, lx, 120, 220);
+    lg.addColorStop(0, 'rgba(240,146,79,0.32)'); lg.addColorStop(1, 'rgba(240,146,79,0)');
+    c.fillStyle = lg; c.fillRect(lx - 230, -60, 460, 380);
+  }
+  /* Trump at the desk (you) */
+  drawFigure(c, 'trump', W / 2 - 260, 470, 2.6, { pose: 'point', look: 0.4, blink: Math.sin(t) > 0.98 });
+  /* the desk + document */
+  c.fillStyle = PAL.wood;
+  rr(c, W / 2 - 90, 400, 470, 150, 8); c.fill();
+  c.fillStyle = PAL.wood3; rr(c, W / 2 - 90, 400, 470, 18, 6); c.fill();
+  c.fillStyle = 'rgba(0,0,0,0.2)'; c.fillRect(W / 2 - 90, 536, 470, 14);
+  /* document fills the desk */
+  const dx = W / 2 - 60, dy = 372, dw = 410, dh = 176;
+  c.fillStyle = '#faf6ea'; rr(c, dx, dy, dw, dh, 3); c.fill();
+  c.strokeStyle = '#d8cba0'; c.lineWidth = 2; rr(c, dx, dy, dw, dh, 3); c.stroke();
+  c.fillStyle = '#1a1a1a'; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'center';
+  c.fillText('WHITE HOUSE ACCORD', dx + dw / 2, dy + 26);
+  c.font = '10px Georgia, serif';
+  c.fillText('Joint Commitment on Frontier Responsibilities', dx + dw / 2, dy + 42);
+  /* signature block */
+  c.font = '11px Georgia, serif'; c.textAlign = 'left';
+  const names = ['Sundar Pichai — Google / Alphabet', 'Dario Amodei — Anthropic', 'Mark Zuckerberg — Meta',
+                 'Greg Brockman — OpenAI', 'Elon Musk — xAI', 'Jensen Huang — Nvidia'];
+  names.forEach((n2, i) => c.fillText(n2, dx + 30, dy + 66 + i * 15));
+  /* the typo line */
+  const ty = dy + 66 + 6 * 15;
+  c.fillStyle = '#1a1a1a'; c.font = 'bold 12.5px Georgia, serif';
+  const line = 'Donald J. Trump, President of the Unites States';
+  c.fillText(line, dx + 30, ty);
+  const tw2 = c.measureText(line).width;
+  c.strokeStyle = PAL.red; c.lineWidth = 1.6;
+  c.beginPath(); c.moveTo(dx + 30, ty + 4); c.lineTo(dx + 30 + tw2, ty + 4); c.stroke();
+  /* camera flash */
+  const fl = Math.sin(t * 2.2);
+  if (fl > 0.9) {
+    const fg = c.createRadialGradient(W / 2, 300, 4, W / 2, 300, 200);
+    fg.addColorStop(0, 'rgba(255,255,255,0.5)'); fg.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = fg; c.fillRect(0, 100, W, 400);
+  }
+  /* sign line narration */
+  c.fillStyle = 'rgba(245,239,221,0.92)';
+  const sl = SIGN_LINES[Math.min(G.signLine, SIGN_LINES.length - 1)];
+  c.font = 'italic 15px Georgia, serif'; c.textAlign = 'left';
+  wrapText(c, sl, W / 2 - 330, H - 130, 660, 20);
+  /* choices: giant, readable */
+  if (G.signPhase === 'choices') {
+    SIGN_CHOICES.forEach((ch, i) => {
+      const bw2 = 250, bx2 = W / 2 - 395 + i * 265, by2 = H - 92;
+      const hot2 = MX > bx2 && MX < bx2 + bw2 && MY > by2 && MY < by2 + 54;
+      c.fillStyle = hot2 ? PAL.gold : 'rgba(16,20,28,0.85)';
+      rr(c, bx2, by2, bw2, 54, 8); c.fill();
+      c.strokeStyle = PAL.gold; c.lineWidth = 2; rr(c, bx2, by2, bw2, 54, 8); c.stroke();
+      c.fillStyle = hot2 ? '#101b2d' : PAL.gold2; c.font = 'bold 15px Georgia, serif'; c.textAlign = 'center';
+      c.fillText(ch.t, bx2 + bw2 / 2, by2 + 33);
+      HOTRECTS.push({ x: bx2, y: by2, w: bw2, h: 54, id: 'sign_' + ch.id });
+    });
+  } else if (G.signPhase === 'mic') {
+    /* who got the mic: invisible ledger, visible as a real choice */
+    c.fillStyle = 'rgba(245,239,221,0.92)';
+    c.font = 'italic 15px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('Trump points at the room: “Who says a word?”', W / 2, H - 150);
+    const talked = G.talksDone.slice(0, 3);
+    const all = talked.concat(['nobody']);
+    const bw2 = Math.min(180, (W - 120) / all.length - 12);
+    const totalW = all.length * bw2 + (all.length - 1) * 12;
+    all.forEach((id, i) => {
+      const bx2 = W / 2 - totalW / 2 + i * (bw2 + 12), by2 = H - 118;
+      const label = id === 'nobody' ? 'NO ONE' : CAST.find(k => k.id === id).name.split(' ')[0].toUpperCase();
+      const hot2 = MX > bx2 && MX < bx2 + bw2 && MY > by2 && MY < by2 + 44;
+      c.fillStyle = hot2 ? PAL.gold : 'rgba(16,20,28,0.85)';
+      rr(c, bx2, by2, bw2, 44, 8); c.fill();
+      c.strokeStyle = PAL.gold; c.lineWidth = 2; rr(c, bx2, by2, bw2, 44, 8); c.stroke();
+      c.fillStyle = hot2 ? '#101b2d' : PAL.gold2; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'center';
+      c.fillText(label, bx2 + bw2 / 2, by2 + 27);
+      HOTRECTS.push({ x: bx2, y: by2, w: bw2, h: 44, id: 'mic_' + id });
+    });
+  } else {
+    c.fillStyle = 'rgba(245,239,221,0.5)'; c.font = '11px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('click to continue', W / 2, H - 30);
+  }
+  drawHUD(c);
+}
+
+/* ---- the gaggle: driveway, 20 seconds ---- */
+function drawGaggle(c, t, dt) {
+  /* orange outdoor light */
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#160e06'); g.addColorStop(0.6, '#3a2410'); g.addColorStop(1, '#120a06');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  for (const lx of [140, 420, 860, 1140]) {
+    const lg = c.createRadialGradient(lx, 90, 6, lx, 90, 180);
+    lg.addColorStop(0, 'rgba(240,146,79,0.4)'); lg.addColorStop(1, 'rgba(240,146,79,0)');
+    c.fillStyle = lg; c.fillRect(lx - 190, -60, 380, 320);
+  }
+  /* white house behind, more orange */
+  c.fillStyle = '#f0924f';
+  c.globalAlpha = 0.16;
+  c.beginPath(); c.moveTo(W / 2 - 320, 470); c.lineTo(W / 2 - 320, 300); c.lineTo(W / 2, 210); c.lineTo(W / 2 + 320, 300); c.lineTo(W / 2 + 320, 470); c.closePath(); c.fill();
+  c.globalAlpha = 1;
+  for (let i = 0; i < 8; i++) { c.fillStyle = 'rgba(245,239,221,0.12)'; c.fillRect(W / 2 - 280 + i * 76, 340, 18, 130); }
+  /* execs shoulder to shoulder */
+  const ids = ['musk', 'huang', 'zuck', 'pichai', 'amodei', 'brockman'];
+  const shoulders = 96;
+  const x0 = W / 2 - (ids.length - 1) * shoulders / 2 - 40;
+  ids.forEach((id, i) => {
+    const sx = x0 + i * shoulders + Math.sin(t * 0.6 + i) * 2;
+    drawFigure(c, id, sx, 620, 1.7, { pose: 'stand', look: Math.sin(t * 0.9 + i * 1.3) * 0.6, blink: Math.sin(t + i * 3) > 0.98 });
+  });
+  /* camera flashes */
+  for (let i = 0; i < 5; i++) {
+    const fl = Math.sin(t * 2.6 + i * 1.9);
+    if (fl > 0.86) {
+      const fx = 120 + i * 260, fy = 200 + Math.sin(i * 2) * 60;
+      const fg = c.createRadialGradient(fx, fy, 2, fx, fy, 90);
+      fg.addColorStop(0, 'rgba(255,255,255,0.7)'); fg.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = fg; c.fillRect(fx - 100, fy - 100, 200, 200);
+    }
+  }
+  /* beats: 2 flag-driven + 1 random, one at a time */
+  const beats = gaggleBeats(G.flags, G.ledger);
+  const idx = Math.min(beats.length - 1, Math.floor(G.gaggleT / 5.5));
+  const beat = beats[idx];
+  const a = Math.min(1, (5.5 - (G.gaggleT % 5.5)) / 0.9);
+  c.fillStyle = 'rgba(7,10,18,' + (0.8 * a) + ')';
+  const bw2 = 620, bh2 = 74, bx2 = W / 2 - bw2 / 2, by2 = H - bh2 - 26;
+  rr(c, bx2, by2, bw2, bh2, 10); c.fill();
+  c.strokeStyle = 'rgba(201,162,39,' + (0.6 * a) + ')'; c.lineWidth = 1.5; rr(c, bx2, by2, bw2, bh2, 10); c.stroke();
+  c.fillStyle = 'rgba(232,201,106,' + a + ')'; c.font = 'bold 12px Georgia, serif'; c.textAlign = 'left';
+  c.fillText(beat.who, bx2 + 20, by2 + 26);
+  c.fillStyle = 'rgba(245,239,221,' + a + ')'; c.font = 'italic 14px Georgia, serif';
+  wrapText(c, beat.t, bx2 + 20, by2 + 46, bw2 - 40, 17);
+  c.fillStyle = 'rgba(245,239,221,0.4)'; c.font = '11px Georgia, serif'; c.textAlign = 'right';
+  c.fillText('the driveway gaggle', W - 24, 30);
+  drawHUD(c);
+}
+
+/* ---- end card ---- */
+function drawEnd(c, t) {
+  const e = ENDINGS[G.endingId];
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#0c1220'); g.addColorStop(1, '#101b2d');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  /* left: the still, art variant */
+  const fx = 60, fy = 90, fw = 430, fh = 300;
+  c.fillStyle = '#080a10'; rr(c, fx - 14, fy - 14, fw + 28, fh + 28, 6); c.fill();
+  c.strokeStyle = PAL.gold; c.lineWidth = 3; rr(c, fx - 14, fy - 14, fw + 28, fh + 28, 6); c.stroke();
+  c.save(); rr(c, fx, fy, fw, fh, 3); c.clip();
+  drawEndingArt(c, t, e.art, fx, fy, fw, fh);
+  c.restore();
+  /* artifact caption under the still */
+  c.fillStyle = 'rgba(245,239,221,0.5)'; c.font = '11px Georgia, serif'; c.textAlign = 'center';
+  c.fillText(e.art.toUpperCase() + ' — ' + e.title, fx + fw / 2, fy + fh + 34);
+  /* title */
+  c.fillStyle = PAL.gold2; c.font = '600 34px Georgia, serif'; c.textAlign = 'left';
+  c.fillText(e.title, fx + fw + 60, 120);
+  /* 6 lines */
+  c.fillStyle = PAL.cream; c.font = '14px Georgia, serif';
+  endLines(G).forEach((l, i) => {
+    c.fillStyle = i === 5 ? 'rgba(232,201,106,0.85)' : PAL.cream;
+    wrapText(c, l, fx + fw + 60, 152 + i * 30, W - (fx + fw + 60) - 60, 19);
+  });
+  /* share card: fake X post */
+  const sc = shareCard(G);
+  const sx2 = fx + fw + 60, sy2 = 370, sw2 = 330, sh2 = 92;
+  c.fillStyle = '#0c1320'; rr(c, sx2, sy2, sw2, sh2, 10); c.fill();
+  c.strokeStyle = '#26365a'; c.lineWidth = 1.5; rr(c, sx2, sy2, sw2, sh2, 10); c.stroke();
+  c.fillStyle = '#e8c96a'; c.font = 'bold 11px Georgia, serif'; c.textAlign = 'left';
+  c.fillText(sc.who, sx2 + 14, sy2 + 24);
+  c.fillStyle = '#dfe5f5'; c.font = 'italic 12px Georgia, serif';
+  wrapText(c, sc.txt, sx2 + 14, sy2 + 42, sw2 - 28, 15);
+  c.fillStyle = '#7a8ba0'; c.font = '10px Georgia, serif';
+  c.fillText('♥ ' + sc.likes + '   the internet reacts', sx2 + 14, sy2 + sh2 - 10);
+  /* buttons */
+  uiBtn(sx2, sy2 + sh2 + 16, 150, 40, 'again', 'PLAY AGAIN');
+  uiBtn(sx2 + 162, sy2 + sh2 + 16, 180, 40, 'another', 'TRY ANOTHER CEO');
+}
+
+/* ---- ending art variants ---- */
+function drawEndingArt(c, t, art, x, y, w, h) {
+  if (art === 'pulitzer') {
+    c.fillStyle = '#2a1c0c'; c.fillRect(x, y, w, h);
+    for (let i = 0; i < 6; i++) drawFigure(c, ['musk','huang','zuck','pichai','amodei','brockman'][i], x + 50 + i * 66, y + h - 30, 0.9, { pose: 'stand' });
+    drawFigure(c, 'trump', x + w / 2, y + h - 34, 1.05, { pose: 'point' });
+    c.fillStyle = PAL.gold; c.font = 'bold 12px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('★ AWARD ★', x + w / 2, y + 22);
+  } else if (art === 'monologue') {
+    c.fillStyle = '#0c0e14'; c.fillRect(x, y, w, h);
+    c.fillStyle = '#16233c'; rr(c, x + 40, y + 30, w - 80, 110, 4); c.fill();
+    c.fillStyle = PAL.gold2; c.font = 'bold 22px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('UNITES STATES.', x + w / 2, y + 92);
+    c.fillStyle = '#0c0e14'; rr(c, x + w / 2 - 60, y + h - 90, 120, 50, 6); c.fill();
+    c.fillStyle = '#e8c96a'; c.beginPath(); c.arc(x + w / 2, y + h - 80, 8, 0, 7); c.fill();
+  } else if (art === 'cold') {
+    c.fillStyle = '#0e1420'; c.fillRect(x, y, w, h);
+    for (let i = 0; i < 4; i++) { c.fillStyle = '#1a2230'; rr(c, x + 40 + i * 90, y + 80, 60, 140, 6); c.fill(); }
+    drawFigure(c, 'amodei', x + w - 90, y + h - 30, 0.95, { pose: 'stand' });
+    c.fillStyle = 'rgba(140,170,220,0.2)'; c.fillRect(x, y, w, h);
+    c.fillStyle = PAL.cream; c.font = 'italic 12px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('“Testing regimes, actual ones.”', x + w / 2, y + 40);
+  } else if (art === 'split') {
+    c.fillStyle = '#101b2d'; c.fillRect(x, y, w, h);
+    c.fillStyle = '#0c1320'; c.fillRect(x, y, w / 2, h);
+    c.fillStyle = PAL.gold2; c.font = 'bold 26px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('GROK', x + w * 0.25, y + h / 2);
+    c.fillStyle = '#3f7d4e'; c.font = 'bold 26px Georgia, serif';
+    c.fillText('DOTS', x + w * 0.75, y + h / 2);
+    c.strokeStyle = PAL.gold; c.lineWidth = 2; c.beginPath(); c.moveTo(x + w / 2, y + 14); c.lineTo(x + w / 2, y + h - 14); c.stroke();
+    drawFigure(c, 'trump', x + w / 2, y + h - 16, 0.72, { pose: 'stand' });
+  } else if (art === 'wafer') {
+    c.fillStyle = '#1a1c22'; c.fillRect(x, y, w, h);
+    /* giant vial */
+    c.fillStyle = 'rgba(240,220,150,0.9)'; rr(c, x + w / 2 - 26, y + 40, 52, 130, 14); c.fill();
+    c.fillStyle = '#d9c07a'; rr(c, x + w / 2 - 22, y + 120, 44, 46, 10); c.fill();
+    c.fillStyle = '#b09a54'; c.fillRect(x + w / 2 - 26, y + 30, 52, 12);
+    c.fillStyle = '#cfd6de'; rr(c, x + w / 2 + 60, y + 150, 60, 24, 3); c.fill();
+    c.fillStyle = PAL.cream; c.font = 'italic 12px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('sand → wafer → GPU', x + w / 2, y + h - 16);
+  } else if (art === 'caption') {
+    c.fillStyle = '#0c0e14'; c.fillRect(x, y, w, h);
+    c.fillStyle = '#16233c'; rr(c, x + 30, y + 40, w - 60, 120, 4); c.fill();
+    c.fillStyle = '#fff'; c.font = 'bold 20px monospace'; c.textAlign = 'center';
+    c.fillText('"morally bidding"', x + w / 2, y + 106);
+    c.fillStyle = PAL.red; c.font = '10px monospace';
+    c.fillText('LIVE CAPTION · META GLASSES', x + w / 2, y + 180);
+    c.strokeStyle = PAL.gold; c.lineWidth = 2; rr(c, x + 30, y + 40, w - 60, 120, 4); c.stroke();
+  } else if (art === 'goblin') {
+    c.fillStyle = '#2a1c0c'; c.fillRect(x, y, w, h);
+    drawFigure(c, 'brockman', x + w / 2 - 60, y + h - 30, 1.0, { pose: 'stand' });
+    drawFigure(c, 'trump', x + w / 2 + 60, y + h - 32, 1.05, { pose: 'point' });
+    /* goblin shirt in the corner */
+    c.fillStyle = '#3f7d4e';
+    c.beginPath(); c.arc(x + w - 40, y + 40, 24, 0, 7); c.fill();
+    c.fillStyle = '#fff'; c.font = 'bold 9px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('DOTS', x + w - 40, y + 44);
+  } else {
+    /* golden */
+    c.fillStyle = '#2a2410'; c.fillRect(x, y, w, h);
+    const g2 = c.createRadialGradient(x + w / 2, y + h / 2, 10, x + w / 2, y + h / 2, w * 0.7);
+    g2.addColorStop(0, 'rgba(244,227,161,0.5)'); g2.addColorStop(1, 'rgba(244,227,161,0)');
+    c.fillStyle = g2; c.fillRect(x, y, w, h);
+    c.strokeStyle = PAL.gold2; c.lineWidth = 3;
+    rr(c, x + 50, y + 50, w - 100, h - 100, 4); c.stroke();
+    c.fillStyle = PAL.gold2; c.font = 'italic 15px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('THE GOLDEN AGE', x + w / 2, y + h / 2 + 5);
+  }
+}
+
+/* ---- pause (controls live here) ---- */
+function drawPause(c, t) {
+  c.fillStyle = 'rgba(7,10,18,0.82)'; c.fillRect(0, 0, W, H);
+  c.fillStyle = PAL.gold2; c.font = '600 28px Georgia, serif'; c.textAlign = 'center';
+  c.fillText('PAUSED', W / 2, 200);
+  c.fillStyle = PAL.cream; c.font = '14px Georgia, serif';
+  const lines = [
+    'A/D or arrows — walk the table',
+    'click a person — talk',
+    'P — pause / resume   ·   M — mute'
+  ];
+  lines.forEach((l, i) => c.fillText(l, W / 2, 250 + i * 30));
+  uiBtn(W / 2 - 90, 380, 180, 44, 'resume', 'RESUME');
+  uiBtn(W / 2 - 90, 436, 180, 36, 'quit_title', 'QUIT TO TITLE');
+}
+
+/* ==================== main.js ==================== */
+/* ==================== main.js — state machine, loop, input, UI, audio ==================== */
+
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+let W = 1280, H = 720, DPR = 1;
+
+function resize() {
+  const scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(1280 * scale * DPR);
+  canvas.height = Math.round(720 * scale * DPR);
+  canvas.style.width = Math.round(1280 * scale) + 'px';
+  canvas.style.height = Math.round(720 * scale) + 'px';
+  ctx.setTransform(scale * DPR, 0, 0, scale * DPR, 0, 0);
+  W = 1280; H = 720;
+}
+
+/* ---- state (scene graph: playerId, talksDone[], flags{}, typoChoice, endingId) ---- */
+const G = {
+  screen: 'title',        // title|cast|how|room|talk|mini|sign|gaggle|end
+  playerId: null,
+  talksDone: [],
+  flags: {},
+  ledger: { rapport: 50, optics: 0, substance: 0, drama: 0, meme: 0, typoAlive: true, sam: false, mic: 'trump' },
+  invitedMic: null,
+  typoChoice: null,
+  endingId: null,
+  playerX: 0.5, vx: 0, walkPhase: 0,
+  talk: null,
+  signLine: 0, signPhase: 'lines',
+  gaggleT: 0,
+  roomT: 0,
+  toast: null,
+  paused: false,
+  t: 0
+};
+let cam = 0;
+let stateFlags = G.flags;   // alias used by mini.js
+let UNLOCKED = { trump: false };
+try {
+  const raw = localStorage.getItem('wh_unlocks');
+  if (raw) { const p = JSON.parse(raw); for (const k in p) if (UNLOCKED.hasOwnProperty(k)) UNLOCKED[k] = !!p[k]; }
+} catch (e) {}
+
+/* ---- input ---- */
+const keys = {};
+let MX = 0, MY = 0, MXY = null, MDOWN = false;
+let CLICKS = [];
+let HOTRECTS = [];
+
+function hitTest(r) {
+  for (const c of CLICKS) { if (c.x >= r.x && c.x <= r.x + r.w && c.y >= r.y && c.y <= r.y + r.h) return true; }
+  return false;
+}
+function clicked(id) {
+  const r = HOTRECTS.find(h => h.id === id);
+  if (!r) return false;
+  for (let i = 0; i < CLICKS.length; i++) {
+    const c = CLICKS[i];
+    if (c.x >= r.x && c.x <= r.x + r.w && c.y >= r.y && c.y <= r.y + r.h) { CLICKS.splice(i, 1); return true; }
+  }
+  return false;
+}
+function uiBtn(x, y, w, h, id, label, primary) {
+  const hot2 = MX > x && MX < x + w && MY > y && MY < y + h;
+  HOTRECTS.push({ x: x, y: y, w: w, h: h, id: id });
+  ctx.fillStyle = primary ? (hot2 ? '#f4e3a1' : PAL.gold) : (hot2 ? '#1d2f4d' : '#16233c');
+  rr(ctx, x, y, w, h, 8); ctx.fill();
+  ctx.strokeStyle = primary ? '#101b2d' : (hot2 ? PAL.gold : '#3a4a68'); ctx.lineWidth = hot2 ? 2.5 : 1.5;
+  rr(ctx, x, y, w, h, 8); ctx.stroke();
+  ctx.fillStyle = primary ? '#101b2d' : PAL.cream;
+  ctx.font = (primary ? 'bold 17px' : '14px') + ' Georgia, serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x + w / 2, y + h / 2 + (primary ? 6 : 5));
+}
+
+/* ---- text helpers ---- */
+function wrapCount(c, text, maxW) {
+  const words = String(text).split(' ');
+  let lines = 1, cur = '';
+  for (const wd of words) {
+    const test = cur ? cur + ' ' + wd : wd;
+    if (c.measureText(test).width > maxW && cur) { lines++; cur = wd; } else { cur = test; }
+  }
+  return lines;
+}
+function wrapText(c, text, x, y, maxW) {
+  const words = String(text).split(' ');
+  let cur = '', yy = y;
+  for (const wd of words) {
+    const test = cur ? cur + ' ' + wd : wd;
+    if (c.measureText(test).width > maxW && cur) { c.fillText(cur, x, yy); yy += 18; cur = wd; } else { cur = test; }
+  }
+  if (cur) c.fillText(cur, x, yy);
+  return yy;
+}
+function wrapTextLines(c, text, maxW) {
+  const words = String(text).split(' ');
+  const lines = []; let cur = '';
+  for (const wd of words) {
+    const test = cur ? cur + ' ' + wd : wd;
+    if (c.measureText(test).width > maxW && cur) { lines.push(cur); cur = wd; } else { cur = test; }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+/* ---- toast: one at a time, dies ---- */
+function toast(t) { G.toast = { t: t, born: G.t }; }
+
+/* ---- audio: tasteful and quiet ---- */
+let AC = null, muted = false;
+function ac() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  return AC;
+}
+function tone(f, dur, type, gain, delay) {
+  const a = ac(); if (!a || muted) return;
+  try {
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type || 'sine'; o.frequency.value = f; g.gain.value = gain || 0.06;
+    o.connect(g); g.connect(a.destination);
+    const t0 = a.currentTime + (delay || 0);
+    o.start(t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.stop(t0 + dur);
+  } catch (e) {}
+}
+function noiseBurst(dur, gain, delay) {
+  const a = ac(); if (!a || muted) return;
+  try {
+    const len = Math.floor(a.sampleRate * dur);
+    const buf = a.createBuffer(1, len, a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = a.createBufferSource(); src.buffer = buf;
+    const g = a.createGain(); g.gain.value = gain || 0.08;
+    src.connect(g); g.connect(a.destination);
+    src.start(a.currentTime + (delay || 0));
+  } catch (e) {}
+}
+function sfx(name) {
+  if (muted) return;
+  if (name === 'ui') tone(520, 0.06, 'sine', 0.04);
+  else if (name === 'talk') tone(340, 0.05, 'sine', 0.035);
+  else if (name === 'good') { tone(523, 0.09, 'sine', 0.05); tone(659, 0.12, 'sine', 0.045, 0.07); }
+  else if (name === 'bad') tone(180, 0.16, 'sawtooth', 0.05);
+  else if (name === 'shutter') noiseBurst(0.07, 0.1);
+  else if (name === 'pen') noiseBurst(0.2, 0.03);
+  else if (name === 'stamp') tone(140, 0.08, 'square', 0.06);
+  else if (name === 'sign') { tone(392, 0.15, 'sine', 0.05); tone(494, 0.2, 'sine', 0.045, 0.1); }
+}
+function toggleMute() { muted = !muted; }
+
+/* ---- run setup: ACT I is where your body is at the table ---- */
+function resetRun(playerId) {
+  G.playerId = playerId;
+  G.talksDone = [];
+  G.flags = {}; stateFlags = G.flags;
+  G.ledger = { rapport: 50, optics: 0, substance: 0, drama: 0, meme: 0, typoAlive: true, sam: false, mic: 'trump' };
+  G.invitedMic = null;
+  G.typoChoice = null;
+  G.endingId = null;
+  G.talk = null;
+  G.signLine = 0; G.signPhase = 'lines';
+  G.gaggleT = 0; G.roomT = 0;
+  G.paused = false;
+  cam = 0;
+  const st = STARTS[playerId];
+  if (st) {
+    G.playerX = st.x;
+    for (const k in st.ledger) G.ledger[k] += st.ledger[k];
+    toast(st.toast);
+  }
+}
+
+function startGame(id) {
+  resetRun(id);
+  G.screen = 'room';
+  sfx('sign');
+}
+
+/* ---- talk flow ---- */
+function openTalk(id) {
+  const tk = TALKS[id];
+  if (!tk) return;
+  const lines = tk.lines.slice();
+  const ref = tk.ref ? tk.ref(G.flags) : null;
+  if (ref && G.talksDone.indexOf(id) !== -1) lines.unshift(ref);
+  G.talk = { id: id, lines: lines, lineIdx: 0, typeT: 0, phase: 'lines', replies: tk.replies, mini: tk.mini };
+  G.screen = 'talk';
+  sfx('talk');
+}
+function advanceTalk() {
+  const tk = G.talk;
+  if (!tk) return;
+  const cur = tk.lines[tk.lineIdx] || '';
+  if (tk.typeT * 34 < cur.length) { tk.typeT = cur.length / 34 + 0.01; return; }
+  if (tk.lineIdx < tk.lines.length - 1) { tk.lineIdx++; tk.typeT = 0; sfx('talk'); }
+}
+function chooseReply(i) {
+  const tk = G.talk;
+  const rep = tk.replies[i];
+  G.ledger.rapport = Math.max(0, Math.min(100, G.ledger.rapport + (rep.r || 0)));
+  if (rep.r >= 6) G.flags.flattered = true;
+  if (rep.residue) for (const k in rep.residue) G.ledger[k] += rep.residue[k];
+  if (rep.flag) G.flags[rep.flag] = true;
+  if (rep.toast) toast(rep.toast);
+  if (rep.r >= 0) sfx('good'); else sfx('bad');
+  if (tk.mini) { G.screen = 'mini'; startMini(tk.mini); }
+  else endTalk();
+}
+function endTalk() {
+  const tk = G.talk;
+  const id = tk.id;
+  G.talk = null;
+  if (id !== 'tombrown' && G.talksDone.indexOf(id) === -1) {
+    G.talksDone.push(id);
+    if (G.talksDone.length === 3) {
+      G.endingId = computeEndingId(G);   /* provisional ending after Act II */
+      toast('The pen is up. Walk to the President’s desk.');
+      sfx('sign');
+    }
+  }
+  G.screen = 'room';
+}
+
+/* ---- signing: you become Trump ---- */
+function startSign() {
+  G.flags.tomIgnored = G.talksDone.indexOf('tombrown') === -1;
+  G.signLine = 0; G.signPhase = 'lines';
+  G.screen = 'sign';
+  sfx('shutter');
+}
+function chooseSign(id) {
+  G.typoChoice = id;
+  if (id === 'fix') G.ledger.typoAlive = false;
+  sfx('pen');
+  G.signPhase = 'mic';
+}
+function pickMic(id) {
+  G.invitedMic = id;
+  G.ledger.mic = id === 'nobody' ? 'trump' : id;
+  G.screen = 'gaggle';
+  G.gaggleT = 0;
+  sfx('shutter');
+}
+
+/* ---- ambient jokes: triggered by real things, one toast at a time ---- */
+const AMBIENT_TRIGGERS = [
+  { id: 'sacks',      when: () => G.playerX < 0.15 },
+  { id: 'karp',       when: () => G.playerX > 0.08 && G.playerX < 0.28 },
+  { id: 'bezos',      when: () => G.playerX > 0.86 },
+  { id: 'lisaSu',     when: () => G.playerX > 0.42 && G.playerX < 0.62 },
+  { id: 'protest',    when: () => G.playerX < 0.1 && G.roomT > 8 },
+  { id: 'americaGov', when: () => G.roomT > 18 },
+  { id: 'samText',    when: () => !!G.flags.samCall },
+  { id: 'johnson',    when: () => !!G.flags.constitution }
+];
+let ambientDone = {};
+
+/* ---- update ---- */
+function update(dt) {
+  if (G.paused) return;
+  G.t += dt;
+  if (G.screen === 'room') {
+    G.roomT += dt;
+    const left = keys['arrowleft'] || keys['a'], right = keys['arrowright'] || keys['d'];
+    G.vx = (right ? 160 : 0) - (left ? 160 : 0);
+    G.playerX = Math.max(0.04, Math.min(0.96, G.playerX + G.vx * dt / W));
+    /* ambient jokes: one at a time */
+    if (!G.toast || G.t - G.toast.born > 5) {
+      for (const trg of AMBIENT_TRIGGERS) {
+        if (!ambientDone[trg.id] && trg.when()) {
+          ambientDone[trg.id] = true;
+          toast(AMBIENT[trg.id]);
+          break;
+        }
+      }
+    }
+  } else if (G.screen === 'talk') {
+    if (G.talk) G.talk.typeT += dt;
+  } else if (G.screen === 'mini') {
+    if (mini && !mini.done) MINI[mini.id].tick(dt);
+    else if (mini && mini.done) {
+      for (const k in mini.residue) G.ledger[k] += mini.residue[k];
+      if (mini.residue && mini.residue.flag) G.flags[mini.residue.flag] = true;
+      if (mini.toast) toast(mini.toast);
+      sfx(mini.success ? 'good' : 'bad');
+      endTalk();
+    }
+  } else if (G.screen === 'gaggle') {
+    G.gaggleT += dt;
+    const beats = gaggleBeats(G.flags, G.ledger);
+    if (G.gaggleT > beats.length * 5.5 + 1) {
+      G.endingId = computeEndingId(G);
+      G.screen = 'end';
+      sfx('sign');
+    }
+  }
+}
+
+/* ---- draw ---- */
+function draw() {
+  HOTRECTS.length = 0;
+  ctx.clearRect(0, 0, W, H);
+  switch (G.screen) {
+    case 'title': drawTitle(ctx, G.t); break;
+    case 'cast': drawCast(ctx, G.t); break;
+    case 'how': drawHow(ctx, G.t); break;
+    case 'room': drawRoom(ctx, G.t, lastDt); break;
+    case 'talk': drawTalk(ctx, G.t, lastDt); break;
+    case 'mini':
+      if (mini) { MINI[mini.id].draw(ctx, G.t); }
+      break;
+    case 'sign': drawSign(ctx, G.t, lastDt); break;
+    case 'gaggle': drawGaggle(ctx, G.t, lastDt); break;
+    case 'end': drawEnd(ctx, G.t); break;
+  }
+  if (G.paused && (G.screen === 'room' || G.screen === 'talk')) drawPause(ctx, G.t);
+  /* mute toggle in the corner */
+  const mb = { x: W - 34, y: H - 30, w: 24, h: 22 };
+  HOTRECTS.push({ x: mb.x, y: mb.y, w: mb.w, h: mb.h, id: 'mute' });
+  ctx.fillStyle = 'rgba(7,10,18,0.6)'; rr(ctx, mb.x, mb.y, mb.w, mb.h, 5); ctx.fill();
+  ctx.strokeStyle = 'rgba(232,201,106,0.5)'; ctx.lineWidth = 1; rr(ctx, mb.x, mb.y, mb.w, mb.h, 5); ctx.stroke();
+  ctx.fillStyle = muted ? 'rgba(245,239,221,0.4)' : 'rgba(232,201,106,0.9)';
+  ctx.font = 'bold 11px Georgia, serif'; ctx.textAlign = 'center';
+  ctx.fillText(muted ? '×' : '♪', mb.x + 12, mb.y + 15);
+}
+
+/* ---- click handling (immediate mode, after draw registers rects) ---- */
+function handleClicks() {
+  if (G.screen === 'title') {
+    if (clicked('PLAY')) { G.screen = 'cast'; sfx('ui'); }
+    if (clicked('CAST')) { G.screen = 'cast'; sfx('ui'); }
+    if (clicked('HOW')) { G.screen = 'how'; sfx('ui'); }
+  } else if (G.screen === 'cast') {
+    for (const k of CAST) {
+      if (k.starter && clicked('pick_' + k.id)) { startGame(k.id); return; }
+      if (k.locked && UNLOCKED.trump && clicked('pick_' + k.id)) { startGame(k.id); return; }
+    }
+    if (clicked('back_title')) { G.screen = 'title'; sfx('ui'); }
+  } else if (G.screen === 'how') {
+    if (clicked('back_title')) { G.screen = 'title'; sfx('ui'); }
+  } else if (G.screen === 'room') {
+    for (const s of SEATS) {
+      if (s.id === G.playerId) continue;
+      if (clicked('npc_' + s.id)) {
+        if (s.id === 'trump') {
+          if (G.talksDone.length >= 3) startSign();
+          else toast('The pen comes at the signing. Mingle first.');
+        } else openTalk(s.id);
+        return;
+      }
+    }
+  } else if (G.screen === 'talk') {
+    const tk = G.talk;
+    if (!tk) return;
+    const cur = tk.lines[tk.lineIdx] || '';
+    const allShown = tk.lineIdx >= tk.lines.length - 1 && tk.typeT * 34 >= cur.length;
+    if (tk.phase === 'lines' && allShown) tk.phase = 'replies';
+    if (tk.phase === 'replies') {
+      for (let i = 0; i < tk.replies.length; i++) {
+        if (clicked('reply_' + i)) { chooseReply(i); return; }
+      }
+    } else {
+      advanceTalk();
+    }
+  } else if (G.screen === 'sign') {
+    if (G.signPhase === 'lines') {
+      if (G.signLine < SIGN_LINES.length - 1) { G.signLine++; sfx('talk'); }
+      else G.signPhase = 'choices';
+    } else if (G.signPhase === 'choices') {
+      for (const ch of SIGN_CHOICES) {
+        if (clicked('sign_' + ch.id)) { chooseSign(ch.id); return; }
+      }
+    } else if (G.signPhase === 'mic') {
+      const talked = G.talksDone.slice(0, 3);
+      for (let i = 0; i < talked.length; i++) {
+        if (clicked('mic_' + talked[i])) { pickMic(talked[i]); return; }
+      }
+      if (clicked('mic_nobody')) { pickMic('nobody'); return; }
+    }
+  } else if (G.screen === 'end') {
+    if (clicked('again')) { UNLOCKED.trump = true; saveUnlocks(); startGame(G.playerId); return; }
+    if (clicked('another')) { UNLOCKED.trump = true; saveUnlocks(); G.screen = 'cast'; return; }
+  }
+  if (clicked('mute')) toggleMute();
+}
+function saveUnlocks() {
+  try { localStorage.setItem('wh_unlocks', JSON.stringify(UNLOCKED)); } catch (e) {}
+}
+
+/* ---- keyboard ---- */
+window.addEventListener('keydown', function (e) {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (G.screen === 'room' && ['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' '].indexOf(k) >= 0) e.preventDefault();
+  if (k === 'p') {
+    if (G.screen === 'room' || G.screen === 'talk') G.paused = !G.paused;
+  }
+  if (k === 'm') toggleMute();
+  if (k === 'escape' && G.screen === 'talk') { G.talk = null; G.screen = 'room'; }
+});
+window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
+
+/* ---- pointer ---- */
+canvas.addEventListener('pointermove', function (e) {
+  const r = canvas.getBoundingClientRect();
+  MX = (e.clientX - r.left) / r.width * W;
+  MY = (e.clientY - r.top) / r.height * H;
+  MXY = { x: MX, y: MY };
+});
+canvas.addEventListener('pointerdown', function (e) {
+  MDOWN = true;
+  const r = canvas.getBoundingClientRect();
+  CLICKS.push({ x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H });
+});
+window.addEventListener('pointerup', function () { MDOWN = false; });
+
+/* ---- loop ---- */
+let lastTs = 0, lastDt = 0.016;
+function loop(ts) {
+  const dt = Math.min(0.05, lastTs ? (ts - lastTs) / 1000 : 0.016);
+  lastTs = ts;
+  lastDt = dt;
+  update(dt);
+  draw();
+  handleClicks();
+  CLICKS.length = 0;
+  requestAnimationFrame(loop);
+}
+
+/* ---- test hooks (deterministic QA, per threejs-game-skills discipline) ---- */
+window.__GAME_TEST_HOOKS__ = {
+  reset(seed) { RND = mulberry32(seed || 20260929); ambientDone = {}; },
+  state: () => G,
+  ledger: () => G.ledger,
+  flags: () => G.flags,
+  goto(screen) { G.screen = screen; },
+  startGame, openTalk, chooseReply, startSign, chooseSign, pickMic,
+  endMiniForce(success, residue, msg) { if (mini) finishMini(success, residue || {}, msg || ''); },
+  mini: () => mini,
+  advanceTalk,
+  tick(dt) { update(dt || 0.016); draw(); handleClicks(); CLICKS.length = 0; },
+  tickLight(dt) { update(dt || 0.016); handleClicks(); CLICKS.length = 0; },
+  drawFrame() { draw(); },
+  click(x, y) { CLICKS.push({ x: x, y: y }); },
+  rects: () => HOTRECTS
+};
+
+/* ---- boot ---- */
+resize();
+window.addEventListener('resize', resize);
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

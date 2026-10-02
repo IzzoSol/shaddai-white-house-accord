@@ -1,0 +1,26 @@
+{
+  "id": "technocrat",
+  "source": "builtin",
+  "name": "The Technocrat",
+  "type": "technocrat",
+  "summary": "Believes in infrastructure and process. Steady hands, steady optics.",
+  "goals": {
+    "endings": {
+      "sandSermon": 10,
+      "perfect": 8,
+      "constitution": 3
+    },
+    "ledger": {
+      "substance": 0.5,
+      "optics": 0.6
+    }
+  },
+  "skills": {
+    "insight": 0.7,
+    "dexterity": 0.85,
+    "foresight": 0.5
+  },
+  "quirks": {
+    "favoriteSeat": "huang"
+  }
+}

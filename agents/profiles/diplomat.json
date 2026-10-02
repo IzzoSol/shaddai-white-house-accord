@@ -1,0 +1,27 @@
+{
+  "id": "diplomat",
+  "source": "builtin",
+  "name": "The Diplomat",
+  "type": "diplomat",
+  "summary": "Keeps everyone in the room. Wants a clean, official, historic-looking Accord.",
+  "goals": {
+    "endings": {
+      "perfect": 10,
+      "constitution": 6,
+      "safetyCaucus": 4,
+      "sandSermon": 3
+    },
+    "ledger": {
+      "rapport": 0.4,
+      "optics": 0.3
+    }
+  },
+  "skills": {
+    "insight": 0.8,
+    "dexterity": 0.7,
+    "foresight": 0.6
+  },
+  "quirks": {
+    "favoriteSeat": "pichai"
+  }
+}

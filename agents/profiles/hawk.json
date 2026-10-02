@@ -1,0 +1,27 @@
+{
+  "id": "hawk",
+  "source": "builtin",
+  "name": "The Safety Hawk",
+  "type": "hawk",
+  "summary": "Cares about testing regimes more than photos. Will take the colder corner of the room.",
+  "goals": {
+    "endings": {
+      "safetyCaucus": 10,
+      "perfect": 6,
+      "sandSermon": 2
+    },
+    "ledger": {
+      "substance": 1.0,
+      "optics": -0.2,
+      "meme": -0.3
+    }
+  },
+  "skills": {
+    "insight": 0.85,
+    "dexterity": 0.5,
+    "foresight": 0.7
+  },
+  "quirks": {
+    "favoriteSeat": "amodei"
+  }
+}

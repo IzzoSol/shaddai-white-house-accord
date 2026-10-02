@@ -1,0 +1,19 @@
+{
+  "id": "schemer",
+  "source": "builtin",
+  "name": "The Schemer",
+  "type": "strategist",
+  "summary": "Plans the whole lunch. Sees every branch and wants the Golden Age ending.",
+  "goals": {
+    "endings": {
+      "perfect": 10
+    },
+    "ledger": {}
+  },
+  "skills": {
+    "insight": 0.95,
+    "dexterity": 0.75,
+    "foresight": 1.0
+  },
+  "quirks": {}
+}

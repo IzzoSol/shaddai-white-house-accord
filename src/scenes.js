@@ -228,7 +228,7 @@ function drawRoom(c, t, dt) {
     if (wd.talk) {
       HOTRECTS.push({ x: wd.x - 30, y: wd.y - 130, w: 60, h: 140, id: 'npc_tombrown' });
       const near = Math.abs(G.playerX * W - wd.x) < 80;
-      if (near && G.screen === 'room' && G.talksDone.indexOf('tombrown') === -1) {
+      if (near && G.screen === 'room' && !G.tomDone) {
         c.fillStyle = 'rgba(245,239,221,0.92)';
         rr(c, wd.x - 44, wd.y - 158, 88, 22, 11); c.fill();
         c.fillStyle = '#101b2d'; c.font = 'bold 10px Georgia'; c.textAlign = 'center';
@@ -262,7 +262,7 @@ function drawRoom(c, t, dt) {
       c.fillStyle = 'rgba(245,239,221,0.92)';
       rr(c, px2 - 44, 276, 88, 22, 11); c.fill();
       c.fillStyle = '#101b2d'; c.font = 'bold 10px Georgia'; c.textAlign = 'center';
-      c.fillText(isTrump ? (G.talksDone.length >= 3 ? 'THE DESK' : 'AT THE SIGNING') : (talked ? 'AGAIN' : 'TALK'), px2, 291);
+      c.fillText(isTrump ? (G.talksDone.length >= 3 ? 'THE DESK' : 'AT THE SIGNING') : (talked ? 'AGAIN' : (G.talksDone.length >= 3 ? 'PEN IS UP' : 'TALK')), px2, 291);
     }
   }
   /* press cameras in the dark */

@@ -20,6 +20,7 @@ const G = {
   screen: 'title',        // title|cast|how|room|talk|mini|sign|gaggle|end
   playerId: null,
   talksDone: [],
+  tomDone: false,
   flags: {},
   ledger: { rapport: 50, optics: 0, substance: 0, drama: 0, meme: 0, typoAlive: true, sam: false, mic: 'trump' },
   invitedMic: null,
@@ -155,6 +156,7 @@ function toggleMute() { muted = !muted; }
 function resetRun(playerId) {
   G.playerId = playerId;
   G.talksDone = [];
+  G.tomDone = false;
   G.flags = {}; stateFlags = G.flags;
   G.ledger = { rapport: 50, optics: 0, substance: 0, drama: 0, meme: 0, typoAlive: true, sam: false, mic: 'trump' };
   G.invitedMic = null;
@@ -200,6 +202,13 @@ function advanceTalk() {
 function chooseReply(i) {
   const tk = G.talk;
   const rep = tk.replies[i];
+  /* A second conversation is a callback, not a second helping: no effects, no micro-game. */
+  if (G.talksDone.indexOf(tk.id) !== -1 || (tk.id === 'tombrown' && G.tomDone)) {
+    if (rep.toast) toast(rep.toast);
+    sfx('ui');
+    endTalk();
+    return;
+  }
   G.ledger.rapport = Math.max(0, Math.min(100, G.ledger.rapport + (rep.r || 0)));
   if (rep.r >= 6) G.flags.flattered = true;
   if (rep.residue) for (const k in rep.residue) G.ledger[k] += rep.residue[k];
@@ -213,6 +222,7 @@ function endTalk() {
   const tk = G.talk;
   const id = tk.id;
   G.talk = null;
+  if (id === 'tombrown') G.tomDone = true;
   if (id !== 'tombrown' && G.talksDone.indexOf(id) === -1) {
     G.talksDone.push(id);
     if (G.talksDone.length === 3) {
@@ -226,7 +236,7 @@ function endTalk() {
 
 /* ---- signing: you become Trump ---- */
 function startSign() {
-  G.flags.tomIgnored = G.talksDone.indexOf('tombrown') === -1;
+  G.flags.tomIgnored = !G.flags.tomSeen;
   G.signLine = 0; G.signPhase = 'lines';
   G.screen = 'sign';
   sfx('shutter');
@@ -348,10 +358,13 @@ function handleClicks() {
         if (s.id === 'trump') {
           if (G.talksDone.length >= 3) startSign();
           else toast('The pen comes at the signing. Mingle first.');
+        } else if (G.talksDone.length >= 3 && G.talksDone.indexOf(s.id) === -1) {
+          toast('Three conversations is the rule. The pen is up.');
         } else openTalk(s.id);
         return;
       }
     }
+    if (clicked('npc_tombrown')) { openTalk('tombrown'); return; }
   } else if (G.screen === 'talk') {
     const tk = G.talk;
     if (!tk) return;

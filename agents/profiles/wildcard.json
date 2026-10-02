@@ -1,0 +1,26 @@
+{
+  "id": "wildcard",
+  "source": "builtin",
+  "name": "The Wildcard",
+  "type": "wildcard",
+  "summary": "Improvises. Reads the room badly and loves it. Chaos is a feature.",
+  "goals": {
+    "endings": {
+      "absentCEO": 8,
+      "glassesLeak": 6,
+      "promptOff": 5,
+      "viralTypo": 4
+    },
+    "ledger": {
+      "drama": 0.8
+    }
+  },
+  "skills": {
+    "insight": 0.3,
+    "dexterity": 0.5,
+    "foresight": 0.2
+  },
+  "quirks": {
+    "favoriteSeat": "brockman"
+  }
+}

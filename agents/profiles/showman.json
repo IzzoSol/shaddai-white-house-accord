@@ -1,0 +1,28 @@
+{
+  "id": "showman",
+  "source": "builtin",
+  "name": "The Showman",
+  "type": "showman",
+  "summary": "Plays for the clip. Wants the typo to live and the feed to explode.",
+  "goals": {
+    "endings": {
+      "viralTypo": 10,
+      "promptOff": 9,
+      "glassesLeak": 7,
+      "constitution": 2
+    },
+    "ledger": {
+      "meme": 1.0,
+      "drama": 0.6,
+      "typoAlive": 2
+    }
+  },
+  "skills": {
+    "insight": 0.6,
+    "dexterity": 0.6,
+    "foresight": 0.4
+  },
+  "quirks": {
+    "favoriteSeat": "musk"
+  }
+}

@@ -64,14 +64,15 @@ const SEATS = [
   { id:'musk',     x: 0.80 },
   { id:'amodei',   x: 0.94 }
 ];
-function drawTable(c, t) {
+function drawTable(c, t, zh) {
+  zh = zh || H;
   /* carpet */
-  const cg = c.createLinearGradient(0, 560, 0, H);
+  const cg = c.createLinearGradient(0, 560, 0, zh);
   cg.addColorStop(0, '#5d1327'); cg.addColorStop(1, '#2e0a16');
-  c.fillStyle = cg; c.fillRect(0, 560, W, H - 560);
+  c.fillStyle = cg; c.fillRect(0, 560, W, zh - 560);
   c.fillStyle = 'rgba(201,162,39,0.5)'; c.fillRect(0, 560, W, 5);
   c.fillStyle = 'rgba(201,162,39,0.14)';
-  for (let x = 0; x < W; x += 90) c.fillRect(x, 566, 45, H - 566);
+  for (let x = 0; x < W; x += 90) c.fillRect(x, 566, 45, zh - 566);
   /* table top */
   c.fillStyle = PAL.wood2;
   rr(c, -20, 470, W + 40, 92, 6); c.fill();
@@ -232,115 +233,14 @@ function isSpeaking(id) {
 
 /* ---- THE ROOM (playable) ---- */
 function drawRoom(c, t, dt) {
-  /* camera eases toward the player */
-  const target = G.playerX * W - W / 2;
-  cam += (target - cam) * Math.min(1, dt * 3);
-  cam = Math.max(-W * 0.18, Math.min(W * 0.18, cam));
-  c.save();
-  c.translate(-cam * 0.5, 0);
-  drawEastRoomBg(c, t, 'room');
-  c.restore();
-  c.save();
-  c.translate(-cam, 0);
-  drawTable(c, t);
-  /* ambient walkers: Sacks, Karp, Johnson, Vance, Bezos, Lisa passing + Tom Brown at the far end */
-  const walkers = [
-    { id:'sacks', x: 40,  y: 640 },
-    { id:'karp',  x: 130, y: 648 },
-    { id:'vance', x: 1180, y: 644 },
-    { id:'bezos', x: 1230, y: 640 },
-    { id:'johnson', x: 1120, y: 646 },
-    { id:'lisa',  x: 640 + Math.sin(t * 0.22) * 420, y: 636 },
-    { id:'tombrown', x: 1262, y: 644, talk: true }
-  ];
-  for (const wd of walkers) {
-    drawFigure(c, wd.id, wd.x, wd.y, 1.15, { pose: 'stand', look: Math.sin(t * 0.7 + wd.x), t: t, talk: wd.id === 'tombrown' && isSpeaking('tombrown') });
-    if (wd.talk) {
-      HOTRECTS.push({ x: wd.x - 30, y: wd.y - 130, w: 60, h: 140, id: 'npc_tombrown' });
-      const near = Math.abs(G.playerX * W - wd.x) < 80;
-      if (near && G.screen === 'room' && !G.tomDone) {
-        c.fillStyle = 'rgba(245,239,221,0.92)';
-        rr(c, wd.x - 44, wd.y - 158, 88, 22, 11); c.fill();
-        c.fillStyle = '#101b2d'; c.font = 'bold 10px Georgia'; c.textAlign = 'center';
-        c.fillText('TALK', wd.x, wd.y - 143);
-      }
-    }
-  }
-  /* seated signers */
-  for (const s of SEATS) {
-    if (s.id === G.playerId) continue;
-    const px2 = 60 + s.x * (W - 140);
-    const isTrump = s.id === 'trump';
-    const talked = G.talksDone.indexOf(s.id) !== -1;
-    drawFigure(c, s.id, px2, 500, 1.6, {
-      pose: isTrump ? 'point' : 'sit',
-      look: Math.max(-1, Math.min(1, (G.playerX * W - px2) / 200)),
-      blink: Math.sin(t * 0.9 + s.x * 9) > 0.985,
-      t: t, talk: isSpeaking(s.id), exp: G.talk && G.talk.id === s.id ? G.talk.react : null
-    });
-    /* talked badge */
-    if (talked && !isTrump) {
-      c.fillStyle = PAL.green;
-      c.beginPath(); c.arc(px2 + 24, 420, 7, 0, 7); c.fill();
-      c.fillStyle = '#fff'; c.font = 'bold 9px Georgia'; c.textAlign = 'center';
-      c.fillText('✓', px2 + 24, 423);
-    }
-    /* interaction hit rect: includes the TALK bubble above the head + proximity hint */
-    const r = { x: px2 - 34, y: 262, w: 68, h: 258 };
-    HOTRECTS.push({ x: r.x, y: r.y, w: r.w, h: r.h, id: 'npc_' + s.id, npc: s.id });
-    const near = Math.abs(G.playerX * W - px2) < 80;
-    if (near && G.screen === 'room') {
-      c.fillStyle = 'rgba(245,239,221,0.92)';
-      rr(c, px2 - 44, 276, 88, 22, 11); c.fill();
-      c.fillStyle = '#101b2d'; c.font = 'bold 10px Georgia'; c.textAlign = 'center';
-      c.fillText(isTrump ? (G.talksDone.length >= 3 ? 'THE DESK' : 'AT THE SIGNING') : (talked ? 'AGAIN' : (G.talksDone.length >= 3 ? 'PEN IS UP' : 'TALK')), px2, 291);
-    }
-  }
-  /* press cameras in the dark */
-  for (let i = 0; i < 3; i++) {
-    const cx2 = 200 + i * 380 + Math.sin(t * 0.3 + i * 2) * 14;
-    c.fillStyle = '#0a0c12';
-    rr(c, cx2, 588, 54, 30, 4); c.fill();
-    rr(c, cx2 + 16, 574, 22, 16, 3); c.fill();
-    c.fillStyle = '#1a2030';
-    c.beginPath(); c.arc(cx2 + 27, 582, 6, 0, 7); c.fill();
-    /* flash bursts */
-    const fl = Math.sin(t * 1.7 + i * 2.4);
-    if (fl > 0.93) {
-      const fg = c.createRadialGradient(cx2 + 27, 582, 2, cx2 + 27, 582, 60);
-      fg.addColorStop(0, 'rgba(255,255,255,0.75)'); fg.addColorStop(1, 'rgba(255,255,255,0)');
-      c.fillStyle = fg; c.fillRect(cx2 - 40, 530, 140, 120);
-    }
-  }
-  /* the player */
-  const pxx = G.playerX * W;
-  const walking = Math.abs(G.vx) > 4;
-  G.walkPhase = walking ? G.walkPhase + Math.abs(G.vx) * 0.045 : 0;
-  if (walking) G.facing = G.vx < 0 ? -1 : 1;
-  drawFigure(c, G.playerId || 'player', pxx, 662, 1.5, {
-    pose: walking ? 'walk' : 'stand',
-    phase: G.walkPhase,
-    flip: (G.facing || 1) < 0,
-    look: Math.sin(t * 0.8) * 0.5,
-    blink: Math.sin(t * 1.1) > 0.99,
-    t: t
-  });
-  c.restore();
+  worldDraw(c, t, dt);
   drawHUD(c);
 }
 
 /* ---- HUD: exactly four things ---- */
 function drawHUD(c) {
-  /* 1. who you are + 2. rapport bar */
-  c.fillStyle = 'rgba(7,10,18,0.7)';
-  rr(c, 14, 14, 262, 52, 8); c.fill();
-  c.fillStyle = PAL.cream; c.font = 'bold 14px Georgia, serif'; c.textAlign = 'left';
-  c.fillText('YOU ARE: ' + CAST.find(k => k.id === G.playerId).name.toUpperCase(), 26, 34);
-  const frac = Math.max(0, Math.min(1, G.ledger.rapport / 100));
-  c.fillStyle = 'rgba(245,239,221,0.16)'; rr(c, 26, 44, 238, 9, 4); c.fill();
-  c.fillStyle = PAL.gold; rr(c, 26, 44, Math.max(6, 238 * frac), 9, 4); c.fill();
-  c.fillStyle = 'rgba(245,239,221,0.7)'; c.font = '10px Georgia, serif';
-  c.fillText('RAPPORT', 26, 62);
+  /* 1. who you are + the AURA meter + rapport; 2. side goals (drawn by drawAuraMeter) */
+  drawAuraMeter(c, G.t);
   /* 3. objective: the box fits its text */
   const obj = G.talksDone.length >= 3
     ? 'The pen is up. Walk to the President’s desk.'
@@ -579,6 +479,31 @@ function drawGaggle(c, t, dt) {
 }
 
 /* ---- end card ---- */
+function drawAuraReport(c, rx, rw) {
+  const R = auraReport();
+  const col = { S: '#7ef0a8', A: '#c9e86a', B: PAL.gold2, C: '#f0b070', D: '#ff9a90' }[R.rank];
+  c.fillStyle = PAL.gold2; c.font = '600 22px Georgia, serif'; c.textAlign = 'left';
+  c.fillText('YOUR AURA REPORT', rx, 142);
+  c.fillStyle = '#16233c'; rr(c, rx, 160, 150, 152, 16); c.fill();
+  c.strokeStyle = col; c.lineWidth = 3; rr(c, rx, 160, 150, 152, 16); c.stroke();
+  c.fillStyle = col; c.font = '800 96px Georgia, serif'; c.textAlign = 'center'; c.fillText(R.rank, rx + 75, 246);
+  c.fillStyle = PAL.cream; c.font = 'bold 11px Georgia, serif'; c.fillText(R.title.toUpperCase(), rx + 75, 290);
+  c.textAlign = 'left'; c.fillStyle = PAL.gold2; c.font = '600 44px Georgia, serif'; c.fillText(R.score + ' pts', rx + 178, 214);
+  c.fillStyle = 'rgba(245,239,221,0.75)'; c.font = '15px Georgia, serif';
+  c.fillText('Peak aura ' + Math.round(G.auraPeak) + '   ·   lowest ' + Math.round(G.auraStats.lowest), rx + 178, 244);
+  c.fillText('Everything you did counted. Here is where it came from.', rx + 178, 270);
+  const maxPts = 360;
+  R.parts.forEach((p, i) => {
+    const y = 344 + i * 30;
+    c.fillStyle = PAL.cream; c.font = 'bold 14px Georgia, serif'; c.textAlign = 'left'; c.fillText(p.label, rx, y);
+    c.fillStyle = 'rgba(245,239,221,0.6)'; c.font = '13px Georgia, serif'; c.fillText(p.detail, rx + 170, y);
+    const bw = Math.min(150, Math.abs(p.pts) / maxPts * 150);
+    c.fillStyle = 'rgba(245,239,221,0.1)'; rr(c, rx + rw - 230, y - 11, 150, 10, 5); c.fill();
+    c.fillStyle = p.pts >= 0 ? PAL.gold : '#ff7d70'; rr(c, rx + rw - 230, y - 11, Math.max(4, bw), 10, 5); c.fill();
+    c.fillStyle = p.pts >= 0 ? PAL.gold2 : '#ff9a90'; c.font = 'bold 14px Georgia, serif'; c.textAlign = 'right'; c.fillText((p.pts > 0 ? '+' : '') + p.pts, rx + rw, y);
+  });
+}
+
 function drawEnd(c, t) {
   const e = ENDINGS[G.endingId];
   const g = c.createLinearGradient(0, 0, 0, H);
@@ -597,33 +522,47 @@ function drawEnd(c, t) {
   /* title */
   const rx = fx + fw + 56, rw = W - rx - 56;
   c.fillStyle = PAL.gold2; c.font = '600 38px Georgia, serif'; c.textAlign = 'left';
-  c.fillText(e.title, rx, 112);
-  /* the story: each line starts where the last one ended, so wrapped lines never overlap */
-  let y = 152;
-  c.font = '16px Georgia, serif';
-  endLines(G).forEach((l, i) => {
-    c.fillStyle = i === 5 ? 'rgba(232,201,106,0.95)' : PAL.cream;
-    y = wrapText(c, l, rx, y, rw, 22, 'left') + 36;
-  });
-  /* share card: fake X post, placed under the story */
-  const sc = shareCard(G);
-  const sw2 = Math.min(460, rw), sh2 = 104, sx2 = rx, sy2 = Math.max(y - 8, 400);
-  c.fillStyle = '#0c1320'; rr(c, sx2, sy2, sw2, sh2, 10); c.fill();
-  c.strokeStyle = '#26365a'; c.lineWidth = 1.5; rr(c, sx2, sy2, sw2, sh2, 10); c.stroke();
-  c.fillStyle = '#e8c96a'; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'left';
-  c.fillText(sc.who, sx2 + 16, sy2 + 26);
-  c.fillStyle = '#dfe5f5'; c.font = 'italic 14px Georgia, serif';
-  wrapText(c, sc.txt, sx2 + 16, sy2 + 48, sw2 - 32, 18, 'left');
-  c.fillStyle = '#8a9bb0'; c.font = '12px Georgia, serif';
-  c.fillText('♥ ' + sc.likes + '   the internet reacts', sx2 + 16, sy2 + sh2 - 12);
+  if (G.endTab !== 'aura') c.fillText(e.title, rx, 112);
+  if (G.endTab === 'aura') {
+    drawAuraReport(c, rx, rw);
+  } else {
+    /* the story: each line starts where the last one ended, so wrapped lines never overlap */
+    let y = 152;
+    c.font = '16px Georgia, serif';
+    endLines(G).forEach((l, i) => {
+      c.fillStyle = i === 5 ? 'rgba(232,201,106,0.95)' : PAL.cream;
+      y = wrapText(c, l, rx, y, rw, 22, 'left') + 36;
+    });
+    /* share card: fake X post, placed under the story */
+    const sc = shareCard(G);
+    const sw2 = Math.min(460, rw), sh2 = 96, sx2 = rx, sy2 = Math.max(y - 8, 392);
+    c.fillStyle = '#0c1320'; rr(c, sx2, sy2, sw2, sh2, 10); c.fill();
+    c.strokeStyle = '#26365a'; c.lineWidth = 1.5; rr(c, sx2, sy2, sw2, sh2, 10); c.stroke();
+    c.fillStyle = '#e8c96a'; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'left';
+    c.fillText(sc.who, sx2 + 16, sy2 + 26);
+    c.fillStyle = '#dfe5f5'; c.font = 'italic 14px Georgia, serif';
+    wrapText(c, sc.txt, sx2 + 16, sy2 + 48, sw2 - 32, 18, 'left');
+    c.fillStyle = '#8a9bb0'; c.font = '12px Georgia, serif';
+    c.fillText('♥ ' + sc.likes + '   the internet reacts', sx2 + 16, sy2 + sh2 - 12);
+  }
   /* buttons */
-  uiBtn(sx2, sy2 + sh2 + 16, 170, 44, 'again', 'PLAY AGAIN');
-  uiBtn(sx2 + 184, sy2 + sh2 + 16, 210, 44, 'another', 'TRY ANOTHER CEO');
+  const by = 632;
+  uiBtn(rx, by, 160, 44, 'again', 'PLAY AGAIN');
+  uiBtn(rx + 172, by, 200, 44, 'another', 'TRY ANOTHER CEO');
+  uiBtn(rx + 384, by, 190, 44, 'tab_aura', G.endTab === 'aura' ? 'SHOW THE STORY' : 'AURA REPORT', G.endTab !== 'aura');
 }
 
 /* ---- ending art variants ---- */
 function drawEndingArt(c, t, art, x, y, w, h) {
-  if (art === 'pulitzer') {
+  if (art === 'faded') {
+    c.fillStyle = '#0c1018'; c.fillRect(x, y, w, h);
+    const sp = c.createRadialGradient(x + w / 2, y + h * 0.55, 10, x + w / 2, y + h * 0.55, 190);
+    sp.addColorStop(0, 'rgba(255,230,170,0.35)'); sp.addColorStop(1, 'rgba(255,230,170,0)'); c.fillStyle = sp; c.fillRect(x, y, w, h);
+    c.fillStyle = '#241a10'; rr(c, x + w / 2 - 40, y + 70, 80, 130, 10); c.fill(); rr(c, x + w / 2 - 54, y + 190, 108, 22, 6); c.fill();
+    c.fillStyle = 'rgba(201,162,39,0.35)'; rr(c, x + w / 2 - 30, y + 80, 60, 8, 3); c.fill();
+    c.fillStyle = 'rgba(12,16,24,0.55)'; c.fillRect(x, y, w, h);
+    c.fillStyle = PAL.gold; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'center'; c.fillText('THE ONE BY THE CURTAIN', x + w / 2, y + h - 18);
+  } else if (art === 'pulitzer') {
     c.fillStyle = '#2a1c0c'; c.fillRect(x, y, w, h);
     for (let i = 0; i < 6; i++) drawFigure(c, ['musk','huang','zuck','pichai','amodei','brockman'][i], x + 50 + i * 66, y + h - 30, 0.9, { pose: 'stand' });
     drawFigure(c, 'trump', x + w / 2, y + h - 34, 1.05, { pose: 'point' });

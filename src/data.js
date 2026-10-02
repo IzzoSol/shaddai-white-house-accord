@@ -282,6 +282,18 @@ const ENDINGS = {
       'The pen is real. The Dots are real. The layers are a folder.'
     ]
   },
+  faded: {
+    title:'FADED INTO THE WALLPAPER',
+    art:'faded',
+    lines:[
+      'Nobody noticed you leave. That is the whole story.',
+      'The photo has a gap where a person was.',
+      'The Accord is signed. Someone asks who you were.',
+      'The answer: “the one by the curtain.”',
+      'Your aura went out like a phone at one percent.',
+      'Next time: shake a hand, admire a portrait, be seen.'
+    ]
+  },
   perfect: {
     title:'THE GOLDEN AGE',
     art:'golden',
@@ -316,6 +328,7 @@ function computeEndingId(state) {
 function endLines(state) {
   const L = state.ledger, f = state.flags, e = ENDINGS[state.endingId];
   const lines = e.lines.slice();
+  if (state.endingId === 'faded') return lines.slice(0, 6);
   if (L.mic === 'trump') lines[4] = 'Trump got the mic. It became a branding event: Super Intelligence, constitution, tremendous.';
   if (L.mic === 'zuck')  lines[4] = 'Zuck got the mic. The country heard “robust internal controls” in one breath.';
   if (L.mic === 'musk')  lines[4] = 'Musk got the mic. The country heard a two-word post.';
@@ -337,7 +350,8 @@ function shareCard(state) {
     sandSermon: 'Sand. Wafer. GPU. Superintelligence. The vial did the talking.',
     glassesLeak: '[CAPTION] “morally bidding” — live from the East Room.',
     absentCEO: 'Dots are here. The lunch happened. These facts are related.',
-    perfect: 'The Golden Age of Super Intelligence has begun. Tremendous.'
+    perfect: 'The Golden Age of Super Intelligence has begun. Tremendous.',
+    faded: 'Who was standing by the curtain?'
   }[state.endingId];
   const k = (12 + Math.floor(RND() * 88)) * (L.meme >= 3 ? 1000 : 100);   /* in thousands */
   return { who: who, txt: txt, likes: k >= 1000 ? (k / 1000).toFixed(1) + 'M' : k + 'K' };

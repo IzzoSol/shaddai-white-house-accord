@@ -1666,7 +1666,7 @@ function drawAuraReport(c, rx, rw) {
   c.fillStyle = '#16233c'; rr(c, rx, 160, 150, 152, 16); c.fill();
   c.strokeStyle = col; c.lineWidth = 3; rr(c, rx, 160, 150, 152, 16); c.stroke();
   c.fillStyle = col; c.font = '800 96px Georgia, serif'; c.textAlign = 'center'; c.fillText(R.rank, rx + 75, 246);
-  c.fillStyle = PAL.cream; c.font = 'bold 11px Georgia, serif'; c.fillText(R.title.toUpperCase(), rx + 75, 290);
+  c.fillStyle = PAL.cream; c.font = 'bold 14px Georgia, serif'; c.fillText(R.title, rx + 75, 284);
   c.textAlign = 'left'; c.fillStyle = PAL.gold2; c.font = '600 44px Georgia, serif'; c.fillText(R.score + ' pts', rx + 178, 214);
   c.fillStyle = 'rgba(245,239,221,0.75)'; c.font = '15px Georgia, serif';
   c.fillText('Peak aura ' + Math.round(G.auraPeak) + '   ·   lowest ' + Math.round(G.auraStats.lowest), rx + 178, 244);
@@ -2740,7 +2740,6 @@ function drawAuraMeter(c, t) {
   c.fillStyle = '#101b2d'; c.font = 'bold 11px Georgia'; c.textAlign = 'left'; c.fillText('AURA ' + Math.round(a), 34, 53);
   c.fillStyle = col; c.font = 'bold 11px Georgia'; c.textAlign = 'right'; c.fillText(tier.toUpperCase(), 264, 73);
   c.fillStyle = 'rgba(245,239,221,0.6)'; c.font = '10px Georgia'; c.textAlign = 'left'; c.fillText('RAPPORT ' + Math.round(G.ledger.rapport), 26, 73);
-  if (G.screen === 'press') return;
   /* side goals */
   const S = G.auraStats;
   const goals = [
@@ -3570,6 +3569,30 @@ function agentAct(action) {
 
 window.__AGENT_API__ = { observe: agentObserve, legalActions: agentLegalActions, act: agentAct, MINI_OUTCOMES: MINI_OUTCOMES };
 
+</script>
+
+<div id="selftestOut" style="position:fixed;left:-9999px">PENDING</div>
+<script>
+var OUT = document.getElementById('selftestOut');
+OUT.textContent = 'ALIVE';
+window.onerror = function (m) { OUT.textContent = 'ERR:' + m; };
+setTimeout(function () {
+  try {
+    var GH = window.__GAME_TEST_HOOKS__;
+    GH.reset(20260929);
+    OUT.textContent += ' RESET-OK screen=' + GH.state().screen;
+    GH.tickLight(0.05);
+    OUT.textContent += ' TICK-OK';
+    GH.tickLight(0.05);
+    var r = GH.rects();
+    OUT.textContent += ' RECTS=' + r.length;
+    GH.drawFrame();
+    OUT.textContent += ' DRAW-OK';
+    GH.startGame('musk');
+    GH.tickLight(0.05);
+    OUT.textContent += ' GAME-OK screen=' + GH.state().screen;
+  } catch (e) { OUT.textContent += ' CAUGHT:' + e.message; }
+}, 300);
 </script>
 </body>
 </html>

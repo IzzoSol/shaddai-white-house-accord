@@ -22,6 +22,11 @@ function endCutscene() {
     G.screen = 'cast';
   } else if (id === 'desk') {
     startSign();
+  } else if (id === 'launch') {
+    G.auraStats.rocket = true;
+    addAura(auraScale(5), 'rocket launch', 'rocket');
+    G.screen = 'room';
+    toast('The rocket is gone. Several reporters write “tremendous” with a rocket emoji.');
   } else {
     G.screen = 'room';
   }
@@ -78,6 +83,35 @@ function drawMotorcadeCar(c, x, y, lead, t) {
 }
 
 const CUTSCENES = {
+  /* ---- THE LAUNCH: the lawn demo, a countdown, lift-off ---- */
+  launch: {
+    dur: 9,
+    draw(c, t) {
+      const lift = Math.max(0, t - 3.4), y = 640 - lift * lift * 62;
+      const shake = t > 3.2 && t < 7 ? Math.sin(t * 90) * Math.min(6, (t - 3.2) * 5) : 0;
+      c.save(); c.translate(shake * 0.6, shake);
+      const sky = c.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#070b18'); sky.addColorStop(0.7, '#3a3060'); sky.addColorStop(1, '#f0924f');
+      c.fillStyle = sky; c.fillRect(-20, -20, W + 40, H + 40);
+      for (let i = 0; i < 70; i++) { c.fillStyle = 'rgba(245,239,221,' + (0.25 + 0.3 * Math.sin(t + i)) + ')'; c.fillRect((i * 211) % W, (i * 97) % 380, 2, 2); }
+      c.fillStyle = '#0d1a14'; for (let x = -20; x < W + 40; x += 44) { const h = 40 + ((x * 7) % 30); c.beginPath(); c.moveTo(x, 620); c.lineTo(x + 22, 620 - h); c.lineTo(x + 44, 620); c.fill(); }
+      c.fillStyle = '#173a22'; c.fillRect(-20, 620, W + 40, 120);
+      /* smoke blooms from the pad */
+      if (t > 3.2) for (let i = 0; i < 16; i++) {
+        const k = Math.min(1, (t - 3.2) / 4), a = (1 - k) * 0.5, sx = 640 + Math.sin(i * 2.1) * (60 + k * 300), sr = 30 + k * 90 + (i % 4) * 14;
+        c.fillStyle = 'rgba(235,225,210,' + a + ')'; c.beginPath(); c.arc(sx, 636 - (i % 3) * 8, sr, 0, 7); c.fill();
+      }
+      drawRocket(c, 640, y, 1.6 + lift * 0.02, t, t > 3.4 ? Math.min(1, (t - 3.4) / 1.2) : 0);
+      c.restore();
+      /* countdown, then the word */
+      const cd = ['3', '2', '1'];
+      for (let i = 0; i < 3; i++) cutTitle(c, cd[i], 300, t, 0.2 + i * 0.95, 0.2 + i * 0.95 + 0.9, 140, false);
+      cutTitle(c, 'LIFT-OFF', 200, t, 3.5, 7.5, 64, false);
+      cutTitle(c, 'SPACEX · SOUTH LAWN DEMO', 120, t, 0.3, 3.1, 24, true);
+      if (t > 8) { c.fillStyle = 'rgba(5,7,13,' + Math.min(1, (t - 8)) + ')'; c.fillRect(0, 0, W, H); }
+      if (G.cut && G.cut.flashed < 0 && t > 3.4) { G.cut.flashed = 1; sfx('shutter'); }
+    }
+  },
+
   /* ---- THE ARRIVAL: motorcade, doors, six people in, a one-line promise ---- */
   arrival: {
     dur: 12,

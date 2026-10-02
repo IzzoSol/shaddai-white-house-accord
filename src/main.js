@@ -26,7 +26,7 @@ const G = {
   invitedMic: null,
   typoChoice: null,
   endingId: null,
-  playerX: 0.5, vx: 0, walkPhase: 0,
+  playerX: 0.5, vx: 0, vy: 0, walkPhase: 0, endTab: 'story',
   talk: null,
   signLine: 0, signPhase: 'lines',
   gaggleT: 0,
@@ -187,6 +187,8 @@ function resetRun(playerId) {
     for (const k in st.ledger) G.ledger[k] += st.ledger[k];
     toast(st.toast);
   }
+  worldReset(playerId);
+  G.press = null; G.endTab = 'story';
 }
 
 function startGame(id) {
@@ -223,6 +225,7 @@ function chooseReply(i) {
     endTalk();
     return;
   }
+  addAura(auraScale(rep.a !== undefined ? rep.a : Math.round((rep.r || 0) * 0.6)), 'conversation', 'talks');
   G.ledger.rapport = Math.max(0, Math.min(100, G.ledger.rapport + (rep.r || 0)));
   if (rep.r >= 6) G.flags.flattered = true;
   if (rep.residue) for (const k in rep.residue) G.ledger[k] += rep.residue[k];
@@ -240,6 +243,7 @@ function endTalk() {
   if (id === 'tombrown') G.tomDone = true;
   if (id !== 'tombrown' && G.talksDone.indexOf(id) === -1) {
     G.talksDone.push(id);
+    G.auraStats.talks++;
     if (G.talksDone.length === 3) {
       G.endingId = computeEndingId(G);   /* provisional ending after Act II */
       toast('The pen is up. Walk to the President’s desk.');
@@ -289,13 +293,12 @@ function update(dt) {
   if (G.paused) return;
   G.t += dt;
   if (G.screen === 'cutscene') { updateCutscene(dt); return; }
+  if (G.screen === 'press') { updatePress(dt); return; }
   if (G.screen === 'room') {
-    G.roomT += dt;
-    const left = keys['arrowleft'] || keys['a'], right = keys['arrowright'] || keys['d'];
-    G.vx = (right ? 160 : 0) - (left ? 160 : 0);
-    G.playerX = Math.max(0.04, Math.min(0.96, G.playerX + G.vx * dt / W));
-    /* ambient jokes: one at a time */
-    if (!G.toast || G.t - G.toast.born > 5) {
+    worldUpdate(dt);
+    if (G.screen !== 'room') return;
+    /* ambient jokes: one at a time (East Room only) */
+    if (G.zone === 'eastroom' && (!G.toast || G.t - G.toast.born > 5)) {
       for (const trg of AMBIENT_TRIGGERS) {
         if (!ambientDone[trg.id] && trg.when()) {
           ambientDone[trg.id] = true;
@@ -344,6 +347,7 @@ function draw() {
     case 'sign': drawSign(ctx, G.t, lastDt); break;
     case 'gaggle': drawGaggle(ctx, G.t, lastDt); break;
     case 'cutscene': drawCutscene(ctx, G.t); break;
+    case 'press': drawPress(ctx, G.t); break;
     case 'end': drawEnd(ctx, G.t); break;
   }
   if (G.paused && (G.screen === 'room' || G.screen === 'talk')) drawPause(ctx, G.t);
@@ -393,19 +397,10 @@ function handleClicks() {
   } else if (G.screen === 'how') {
     if (clicked('back_title')) { G.screen = 'title'; sfx('ui'); }
   } else if (G.screen === 'room') {
-    for (const s of SEATS) {
-      if (s.id === G.playerId) continue;
-      if (clicked('npc_' + s.id)) {
-        if (s.id === 'trump') {
-          if (G.talksDone.length >= 3) startCutscene('desk');
-          else toast('The pen comes at the signing. Mingle first.');
-        } else if (G.talksDone.length >= 3 && G.talksDone.indexOf(s.id) === -1) {
-          toast('Three conversations is the rule. The pen is up.');
-        } else openTalk(s.id);
-        return;
-      }
-    }
-    if (clicked('npc_tombrown')) { openTalk('tombrown'); return; }
+    if (clicked('mute')) { toggleMute(); return; }
+    while (CLICKS.length) { const ck = CLICKS.shift(); worldClick(ck.x, ck.y); }
+  } else if (G.screen === 'press') {
+    for (let i = 0; i < 3; i++) if (clicked('ans_' + i)) { pressAnswer(i); return; }
   } else if (G.screen === 'talk') {
     const tk = G.talk;
     if (!tk) return;
@@ -437,6 +432,7 @@ function handleClicks() {
   } else if (G.screen === 'end') {
     if (clicked('again')) { UNLOCKED.trump = true; saveUnlocks(); startGame(G.playerId); return; }
     if (clicked('another')) { UNLOCKED.trump = true; saveUnlocks(); G.screen = 'cast'; return; }
+    if (clicked('tab_aura')) { G.endTab = G.endTab === 'aura' ? 'story' : 'aura'; sfx('ui'); return; }
   }
   if (clicked('mute')) toggleMute();
 }
@@ -453,12 +449,17 @@ window.addEventListener('keydown', function (e) {
     if (G.screen === 'room' || G.screen === 'talk') G.paused = !G.paused;
   }
   if (k === 'm') toggleMute();
+  if (G.screen === 'room' && !G.paused) {
+    if (k === 'e' || k === 'enter' || k === ' ') { e.preventDefault(); interactPrimary(); }
+    else if (k === 'f') interactHandshake();
+  }
+  if (G.screen === 'press' && (k === '1' || k === '2' || k === '3')) pressAnswer(+k - 1);
   if (G.screen === 'cutscene' && (k === ' ' || k === 'enter' || k === 'escape')) { e.preventDefault(); skipCutscene(); }
   if (G.screen === 'talk' && G.talk && !G.paused) {
     if ((k === '1' || k === '2') && G.talk.phase === 'replies' && G.talk.replies[+k - 1]) chooseReply(+k - 1);
     else if (k === ' ' || k === 'enter') { e.preventDefault(); CLICKS.push({ x: 2, y: 2 }); }
   } else if (G.screen === 'sign' && !G.paused && (k === ' ' || k === 'enter')) { e.preventDefault(); CLICKS.push({ x: 2, y: 2 }); }
-  if (k === 'escape' && G.screen === 'talk') { G.talk = null; G.screen = 'room'; }
+  if (k === 'escape' && G.screen === 'talk') { if (G.talk && G.talk.phase === 'replies') addAura(-3, 'walked out mid-talk', 'talks'); G.talk = null; G.screen = 'room'; }
 });
 window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
 
@@ -492,6 +493,7 @@ function loop(ts) {
 /* ---- test hooks (deterministic QA, per threejs-game-skills discipline) ---- */
 window.__GAME_TEST_HOOKS__ = {
   reset(seed) { RND = mulberry32(seed || 20260929); ambientDone = {}; },
+  setKey(k, v) { keys[k] = v; },
   state: () => G,
   ledger: () => G.ledger,
   flags: () => G.flags,
@@ -508,6 +510,7 @@ window.__GAME_TEST_HOOKS__ = {
 };
 
 /* ---- boot ---- */
+worldReset('musk');
 resize();
 window.addEventListener('resize', resize);
 requestAnimationFrame(loop);

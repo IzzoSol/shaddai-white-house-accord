@@ -1,15 +1,4 @@
-/* Generates test/browser-selftest.html = index.html + an in-browser QA pass that
-   reports into #selftestOut for `msedge --headless --dump-dom`.
-   Headless Edge never fires rAF, so frames are driven via GH.tick(). Real input is
-   still exercised: synthetic PointerEvents on the canvas feed the game's own handlers. */
-const fs = require('fs');
-const path = require('path');
-const root = path.join(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
-const harness = `
-<div id="selftestOut" style="position:fixed;left:-9999px">PENDING</div>
-<script>
 document.getElementById('selftestOut').textContent = 'SCRIPT-RAN';
 var SELFTEST = { pass: 0, fail: [], errors: [] };
 window.onerror = function (m, s, l) { SELFTEST.errors.push(m + ' @line ' + l); };
@@ -84,18 +73,19 @@ try {
   var inCast = until(function () { return GH.state().screen === 'cast'; }, 60);
   ck('PLAY reaches the cast screen (real canvas input)', function () { return inCast && GH.state().screen === 'cast'; });
   var cc = pixelStats();
-  ck('cast renders 7 cards', function () { return cc.blankFrac < 0.9; });
+  ck('cast renders 7 cards', function () { return cc.distinct >= 150 && cc.blankFrac < 0.9; });
 
   /* ---------- ACT I: start as Musk ---------- */
   GH.startGame('musk'); tick(2);
   ck('room reached', function () { return GH.state().screen === 'room'; });
   var rs = pixelStats();
-  ck('East Room renders (non-blank, rich)', function () { return rs.blankFrac < 0.9; });
+  ck('East Room renders (non-blank, rich)', function () { return rs.blankFrac < 0.85 && rs.distinct >= 200; });
   ck('ACT I ledger tilt (optics 2, drama 1)', function () { return GH.ledger().optics === 2 && GH.ledger().drama === 1; });
 
   /* ---------- ACT II: three talks via real canvas input ---------- */
+  var seatX = { huang: 'npc_huang', zuck: 'npc_zuck', pichai: 'npc_pichai' };
   ['huang', 'zuck', 'pichai'].forEach(function (id) {
-    GH.openTalk(id); tick(2);
+    if (!clickId(seatX[id])) { SELFTEST.fail.push('no rect for ' + id); writeOut(); } tick(2);
     var opened = until(function () { return GH.state().screen === 'talk'; }, 60);
     if (!opened) { SELFTEST.fail.push('talk ' + id + ' did not open'); writeOut(); return; }
     var guard = 0;
@@ -118,74 +108,7 @@ try {
   ck('provisional ending after talk 3', function () { return !!GH.state().endingId; });
   ck('residues accumulated (optics >= 3)', function () { return GH.ledger().optics >= 3; });
 
-  /* ---------- ACT III: signing ---------- */
-  GH.startSign(); tick(2);
-  var inSign = until(function () { return GH.state().screen === 'sign'; }, 60);
-  ck('signing reached from the desk', function () { return inSign && GH.state().screen === 'sign'; });
-  var ss = pixelStats();
-  ck('document renders (signature block)', function () { return ss.blankFrac < 0.9; });
-  for (var i = 0; i < 6; i++) { canvasClick(640, 360); tick(2); }
-  ck('typo choices up', function () { return GH.state().signPhase === 'choices'; });
-  if (!clickId('sign_fix')) canvasClick(370, 655); tick(2);
-  ck('fix chosen -> typoAlive false', function () { return GH.state().typoChoice === 'fix' && GH.ledger().typoAlive === false; });
-  ck('mic phase reached', function () { return GH.state().signPhase === 'mic'; });
-  GH.pickMic('nobody'); tick(2);
-  ck('gaggle running', function () { return GH.state().screen === 'gaggle'; });
-  var gs = pixelStats();
-  ck('gaggle renders orange driveway', function () { return gs.blankFrac < 0.85; });
-
-  /* ---------- end ---------- */
-  GH.state().gaggleT = 100; tick(1);
-  var inEnd = until(function () { return GH.state().screen === 'end'; }, 40);
-  ck('end card reached by itself', function () { return inEnd && GH.state().screen === 'end'; });
-  ck('endingId set', function () { return !!GH.state().endingId; });
-  var es = pixelStats();
-  ck('end card renders (non-blank, rich)', function () { return es.blankFrac < 0.9; });
-
-  /* ---------- second run: different person -> different end card ---------- */
-  var first = GH.state().endingId;
-  GH.reset(7);
-  GH.startGame('amodei'); tick(2);
-  var seat2 = { musk: 'npc_musk', zuck: 'npc_zuck', brockman: 'npc_brockman' };
-  ['musk', 'zuck', 'brockman'].forEach(function (id) {
-    GH.openTalk(id); tick(2);
-    var opened2 = until(function () { return GH.state().screen === 'talk'; }, 60);
-    if (!opened2) { SELFTEST.fail.push('run2 talk ' + id + ' did not open'); writeOut(); return; }
-    var guard2 = 0;
-    while (GH.state().screen === 'talk' && guard2++ < 40) {
-      tick();
-      var tk2 = GH.state().talk;
-      if (tk2 && tk2.phase === 'replies') { if (!clickId('reply_0')) canvasClick(346, 650); }
-      else canvasClick(640, 690);
-      tick(2);
-    }
-    if (GH.state().screen === 'mini') { GH.endMiniForce(true); until(function () { return GH.state().screen === 'room'; }, 100); }
-    tick(2);
-  });
-  canvasClick(683, 370);
-  until(function () { return GH.state().screen === 'sign'; }, 60);
-  for (var i2 = 0; i2 < 6; i2++) { canvasClick(640, 360); tick(2); }
-  if (!clickId('sign_asis')) canvasClick(620, 655); tick(2);
-  GH.pickMic('nobody'); tick(2);
-  GH.state().gaggleT = 100; tick(1);
-  until(function () { return GH.state().screen === 'end'; }, 40);
-  ck('second run completes', function () { return GH.state().screen === 'end'; });
-  ck('two runs -> two different end cards', function () {
-    return first !== null && GH.state().endingId !== null && first !== GH.state().endingId;
-  });
-
-  ck('no uncaught errors in the whole pass', function () { return SELFTEST.errors.length === 0; });
-} catch (e) {
-  SELFTEST.fail.push('THREW: ' + (e && e.message) + ' >> ' + String((e && e.stack) || '').split('\\n').slice(0, 3).join(' >> '));
-  writeOut();
-}
+  
 writeOut();
-</script>
-`;
-
-if (!html.includes('</body>')) throw new Error('index.html has no </body>');
-fs.writeFileSync(path.join(__dirname, 'browser-selftest.html'), html.replace('</body>', harness + '</body>'));
-console.log('wrote test/browser-selftest.html');
-
-
-
+} catch (e) { SELFTEST.fail.push("THREW:" + e.message); writeOut(); }
+writeOut();

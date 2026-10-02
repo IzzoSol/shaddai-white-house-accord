@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = __dirname;
-const parts = ['data.js', 'art.js', 'mini.js', 'scenes.js', 'main.js', 'agent.js'];
+const parts = ['data.js', 'art.js', 'mini.js', 'scenes.js', 'assets.list.js', 'assets.js', 'cutscene.js', 'main.js', 'agent.js'];
 
 const shell = fs.readFileSync(path.join(root, 'src', 'shell.html'), 'utf8');
 let js = '';

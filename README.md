@@ -76,3 +76,23 @@ zero console errors.
 ## Agents
 
 Any controller — a scripted bot, a model-driven agent, a forged Shaddai bot — can play through the game's agent interface. See `agents/README.md`.
+
+## Cutscenes and motion
+
+- **The Arrival** plays the first time you press PLAY (and from "Watch the intro"): motorcade, six people walking in, a one-line promise. **The Desk** pushes in on the document before the signing. Click or press Space to skip either.
+- You walk as the character you chose. Speakers move their mouths, gesture and breathe, and react to your reply.
+- Screens fade through black. Opening a conversation or a micro-game does not.
+
+## Optional generated art (your own keys)
+
+The game is fully drawn in code and needs no assets. For a richer menu, intro backdrop and ending stills:
+
+```
+# put your keys in a git-ignored .env.local (never commit them, never put them in the game):
+#   HF_TOKEN_1=...   up to HF_TOKEN_6=...      (or just HF_TOKEN)
+node tools/hf-assets.mjs --list           # what it will make
+node tools/hf-assets.mjs --dry-run        # checks every prompt, needs no keys
+node tools/hf-assets.mjs                  # makes assets/gen/*.png + a provenance file for each
+node build.js                             # the game picks them up automatically
+```
+Keys rotate: a rejected key is dropped, a rate-limited one waits its turn and the next key is used. Set `HF_ASSET_URL` if your provider's endpoint differs from the default. Only use keys you own and check your provider's terms for rotating several. The tool makes **places and objects only**: every prompt must say "no people" and may not name anyone in the cast. Characters stay as the game's stylized caricatures.

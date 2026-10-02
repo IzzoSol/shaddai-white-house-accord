@@ -1,0 +1,68 @@
+{
+  "defaults": {
+    "model": "black-forest-labs/FLUX.1-schnell",
+    "url": "https://router.huggingface.co/hf-inference/models/{model}",
+    "width": 1280,
+    "height": 720
+  },
+  "assets": [
+    {
+      "id": "title-bg",
+      "use": "main menu background (slow drift)",
+      "prompt": "editorial vector illustration, empty grand state dining room at dusk, long banquet table with place settings, tall windows with warm light, red velvet drapes, gold trim, navy and gold palette, cinematic wide shot, flat shapes, no people, no text"
+    },
+    {
+      "id": "arrival-bg",
+      "use": "intro cutscene backdrop",
+      "prompt": "editorial vector illustration, night exterior of a grand neoclassical government residence, white columns, warm lit windows, wet plaza reflecting lights, distant camera flash glows, navy and gold palette, flat shapes, no people, no text"
+    },
+    {
+      "id": "end-constitution",
+      "use": "ending still: The Constitution of Nothing",
+      "width": 1152, "height": 800,
+      "prompt": "editorial vector illustration, an ornate parchment document on a lectern with a gold pen, soft spotlight, deep navy background, gold accents, no people, no text"
+    },
+    {
+      "id": "end-viralTypo",
+      "use": "ending still: The Viral Typo",
+      "width": 1152, "height": 800,
+      "prompt": "editorial vector illustration, a giant glowing phone screen floating in a dark room showing a blurred social feed, scattered heart icons, navy and gold, no people, no readable text"
+    },
+    {
+      "id": "end-safetyCaucus",
+      "use": "ending still: The Safety Caucus",
+      "width": 1152, "height": 800,
+      "prompt": "editorial vector illustration, a small cold corner table with a laboratory test rig and a single desk lamp, cool blue light, empty room, no people, no text"
+    },
+    {
+      "id": "end-promptOff",
+      "use": "ending still: The Prompt-Off",
+      "width": 1152, "height": 800,
+      "prompt": "editorial vector illustration, two glowing chat bubbles facing each other across a long table, neon gold and cyan, dark room, no people, no readable text"
+    },
+    {
+      "id": "end-sandSermon",
+      "use": "ending still: The Sand Sermon",
+      "width": 1152, "height": 800,
+      "prompt": "editorial vector illustration, a glass vial of glowing sand resting on a velvet cloth beside a silicon wafer, dramatic spotlight, reverent mood, deep navy, no people, no text"
+    },
+    {
+      "id": "end-glassesLeak",
+      "use": "ending still: The Glasses Leak",
+      "width": 1152, "height": 800,
+      "prompt": "editorial vector illustration, a pair of smart glasses on a podium projecting a bright caption wall behind it, scrambled letters, navy and gold, no people, no readable text"
+    },
+    {
+      "id": "end-absentCEO",
+      "use": "ending still: The Absent CEO",
+      "width": 1152, "height": 800,
+      "prompt": "editorial vector illustration, an empty chair at the end of a banquet table, a laptop showing a ringing video call, a cardboard box of merchandise, warm lamp light, no people, no readable text"
+    },
+    {
+      "id": "end-perfect",
+      "use": "ending still: The Golden Age",
+      "width": 1152, "height": 800,
+      "prompt": "editorial vector illustration, sunrise over a gleaming empty marble hall with golden light beams, ornate columns, triumphant mood, gold and cream, no people, no text"
+    }
+  ]
+}

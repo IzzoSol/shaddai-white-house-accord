@@ -46,7 +46,9 @@ const CHAR_ART = {
 };
 
 /* ---- head (drawn at origin, feet baseline is +H) ---- */
-function drawHead(c, a, s, blink, look) {
+function drawHead(c, a, s, blink, look, mouth, expOver, brow) {
+  mouth = mouth || 0; brow = brow || 0;
+  const exp = expOver || a.exp;
   const hw = 13 * s;               // half-width of skull
   c.save();
   c.translate(0, -62 * s);
@@ -140,8 +142,9 @@ function drawHead(c, a, s, blink, look) {
   }
   /* brows */
   c.strokeStyle = shade(a.hairC, -18); c.lineWidth = 1.5 * s;
-  c.beginPath(); c.moveTo(-ex - 2.6 * s, ey - 3.4 * s); c.lineTo(-ex + 2.2 * s, ey - 4 * s);
-  c.moveTo(ex - 2.2 * s, ey - 4 * s); c.lineTo(ex + 2.6 * s, ey - 3.4 * s); c.stroke();
+  const bl = brow * 1.6 * s;
+  c.beginPath(); c.moveTo(-ex - 2.6 * s, ey - 3.4 * s - bl); c.lineTo(-ex + 2.2 * s, ey - 4 * s - bl);
+  c.moveTo(ex - 2.2 * s, ey - 4 * s - bl); c.lineTo(ex + 2.6 * s, ey - 3.4 * s - bl); c.stroke();
 
   /* nose */
   c.strokeStyle = shade(a.skin, -55); c.lineWidth = 1.2 * s;
@@ -149,13 +152,19 @@ function drawHead(c, a, s, blink, look) {
 
   /* mouth by expression */
   c.strokeStyle = '#7a3a30'; c.lineWidth = 1.35 * s;
-  c.beginPath();
-  if (a.exp === 'smile')      { c.moveTo(-3 * s, 8.4 * s); c.quadraticCurveTo(0, 10.4 * s, 3 * s, 8.4 * s); }
-  else if (a.exp === 'stiff') { c.moveTo(-2.6 * s, 8.8 * s); c.lineTo(2.6 * s, 8.8 * s); }
-  else if (a.exp === 'wince') { c.moveTo(-2.8 * s, 9.4 * s); c.quadraticCurveTo(0, 7.6 * s, 2.8 * s, 9.4 * s); }
-  else if (a.exp === 'preacher') { c.moveTo(-2.2 * s, 9 * s); c.quadraticCurveTo(0, 9.8 * s, 2.2 * s, 9 * s); }
-  else                        { c.moveTo(-2.4 * s, 9 * s); c.lineTo(2.4 * s, 9 * s); }
-  c.stroke();
+  if (mouth > 0.08) {                                   /* speaking: the mouth opens and closes */
+    c.fillStyle = '#4a1e1a';
+    c.beginPath(); c.ellipse(0, 9 * s, (2.3 + 0.4 * mouth) * s, (0.6 + 2.4 * mouth) * s, 0, 0, 7); c.fill();
+  } else {
+    c.beginPath();
+    if (exp === 'smile')      { c.moveTo(-3 * s, 8.4 * s); c.quadraticCurveTo(0, 10.4 * s, 3 * s, 8.4 * s); }
+    else if (exp === 'grin')  { c.moveTo(-3.6 * s, 8 * s); c.quadraticCurveTo(0, 12 * s, 3.6 * s, 8 * s); }
+    else if (exp === 'stiff') { c.moveTo(-2.6 * s, 8.8 * s); c.lineTo(2.6 * s, 8.8 * s); }
+    else if (exp === 'wince') { c.moveTo(-2.8 * s, 9.4 * s); c.quadraticCurveTo(0, 7.6 * s, 2.8 * s, 9.4 * s); }
+    else if (exp === 'preacher') { c.moveTo(-2.2 * s, 9 * s); c.quadraticCurveTo(0, 9.8 * s, 2.2 * s, 9 * s); }
+    else                        { c.moveTo(-2.4 * s, 9 * s); c.lineTo(2.4 * s, 9 * s); }
+    c.stroke();
+  }
 
   /* beard */
   if (a.beard) {
@@ -181,7 +190,8 @@ function drawHead(c, a, s, blink, look) {
 }
 
 /* ---- torso / suit (origin at hips) ---- */
-function drawTorso(c, a, s, armPhase, pose) {
+function drawTorso(c, a, s, armPhase, pose, gest) {
+  gest = gest || 0;
   const w = 21 * s;   // half shoulder width
   c.save();
   /* legs for standing poses */
@@ -232,10 +242,10 @@ function drawTorso(c, a, s, armPhase, pose) {
   if (pose === 'sit') {
     /* hands forward onto table */
     c.beginPath(); c.moveTo(-w + 2 * s, armY); c.quadraticCurveTo(-w - 6 * s, armY + 14 * s, -10 * s, 4 * s); c.stroke();
-    c.beginPath(); c.moveTo(w - 2 * s, armY); c.quadraticCurveTo(w + 6 * s, armY + 14 * s, 10 * s, 4 * s); c.stroke();
+    c.beginPath(); c.moveTo(w - 2 * s, armY); c.quadraticCurveTo(w + 6 * s + gest * 4 * s, armY + 14 * s - gest * 12 * s, 10 * s + gest * 4 * s, 4 * s - gest * 14 * s); c.stroke();
     c.fillStyle = a.skin;
     c.beginPath(); c.arc(-10 * s, 4 * s, 3.2 * s, 0, 7); c.fill();
-    c.beginPath(); c.arc(10 * s, 4 * s, 3.2 * s, 0, 7); c.fill();
+    c.beginPath(); c.arc(10 * s + gest * 4 * s, 4 * s - gest * 14 * s, 3.2 * s, 0, 7); c.fill();
   } else if (pose === 'point') {
     /* one arm raised in the Trump gesture */
     c.beginPath(); c.moveTo(-w + 2 * s, armY); c.lineTo(-w - 2 * s, armY + 16 * s); c.stroke();
@@ -244,11 +254,13 @@ function drawTorso(c, a, s, armPhase, pose) {
     c.beginPath(); c.arc(w + 14 * s, armY - 18 * s, 3.4 * s, 0, 7); c.fill();
   } else {
     const sw = pose === 'walk' ? Math.sin(armPhase) * 8 * s : 0;
+    /* the right hand lifts while talking */
+    const rx = w - 3 * s - sw * 0.5 + gest * 9 * s, ry = -2 * s - gest * 24 * s;
     c.beginPath(); c.moveTo(-w + 2 * s, armY); c.lineTo(-w + 3 * s + sw * 0.5, -2 * s); c.stroke();
-    c.beginPath(); c.moveTo(w - 2 * s, armY); c.lineTo(w - 3 * s - sw * 0.5, -2 * s); c.stroke();
+    c.beginPath(); c.moveTo(w - 2 * s, armY); c.lineTo(rx, ry); c.stroke();
     c.fillStyle = a.skin;
     c.beginPath(); c.arc(-w + 3 * s + sw * 0.5, -1 * s, 3 * s, 0, 7); c.fill();
-    c.beginPath(); c.arc(w - 3 * s - sw * 0.5, -1 * s, 3 * s, 0, 7); c.fill();
+    c.beginPath(); c.arc(rx, ry + s, 3 * s, 0, 7); c.fill();
   }
   /* accessories in hand */
   if (a.phone) {
@@ -283,7 +295,9 @@ function drawTorso(c, a, s, armPhase, pose) {
   c.restore();
 }
 
-/* ---- full figure ---- */
+/* ---- full figure ----
+   opt: pose ('stand'|'walk'|'sit'|'point'), phase (walk cycle), look (-1..1), blink, flip,
+        t (time, for breathing), talk (true while speaking), exp (expression override: 'smile'|'grin'|'wince'|...). */
 function drawFigure(c, id, x, y, s, opt) {
   opt = opt || {};
   const a = CHAR_ART[id] || CHAR_ART.player;
@@ -291,14 +305,28 @@ function drawFigure(c, id, x, y, s, opt) {
   const phase = opt.phase || 0;
   const look = opt.look || 0;
   const blink = opt.blink || false;
+  const t = opt.t || 0;
+  const seed = (String(id).charCodeAt(0) || 1) + String(id).length * 3;
+  const talking = !!opt.talk;
+  /* life: breathing always; mouth, brow, hand and a small nod while speaking; a bounce while walking */
+  const breathe = 1 + 0.013 * Math.sin(t * 1.7 + seed);
+  const mouth = talking ? (0.5 + 0.5 * Math.sin(t * 13 + seed)) * (0.55 + 0.45 * Math.sin(t * 4.7 + seed)) : 0;
+  const gest = talking ? Math.max(0, Math.sin(t * 2.2 + seed)) * 0.85 : 0;
+  const brow = talking ? Math.max(0, Math.sin(t * 3.1 + seed * 2)) * 0.6 : 0;
+  const bounce = pose === 'walk' ? -Math.abs(Math.sin(phase)) * 2.4 * s : 0;
+  const nod = talking ? Math.sin(t * 5.2 + seed) * 0.6 * s : 0;
   c.save();
-  c.translate(x, y);
+  c.translate(x, y + bounce);
   if (opt.flip) c.scale(-1, 1);
-  /* gold rim-light shadow */
+  /* shadow stays on the floor while the body bounces */
   c.fillStyle = 'rgba(0,0,0,0.28)';
-  c.beginPath(); c.ellipse(0, 1.5 * s, 14 * s, 3.4 * s, 0, 0, 7); c.fill();
-  drawTorso(c, a, s, phase, pose);
-  drawHead(c, a, s, blink, look);
+  c.beginPath(); c.ellipse(0, 1.5 * s - bounce, 14 * s, 3.4 * s, 0, 0, 7); c.fill();
+  c.save(); c.scale(1, breathe);
+  drawTorso(c, a, s, phase, pose, gest);
+  c.restore();
+  c.save(); c.translate(0, nod + (breathe - 1) * -30 * s);
+  drawHead(c, a, s, blink, look, mouth, opt.exp, brow);
+  c.restore();
   c.restore();
 }
 

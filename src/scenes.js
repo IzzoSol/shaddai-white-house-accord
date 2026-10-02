@@ -99,14 +99,20 @@ function drawTable(c, t) {
 
 /* ---- title ---- */
 function drawTitle(c, t) {
-  drawEastRoomBg(c, t, 'title');
-  drawTable(c, t);
-  /* tiny standing silhouettes */
-  for (let i = 0; i < 6; i++) {
-    const sx = 240 + i * 150 + Math.sin(t * 0.5 + i) * 3;
-    c.fillStyle = 'rgba(10,12,20,0.85)';
-    c.beginPath(); c.ellipse(sx, 428, 9, 26, 0, 0, 7); c.fill();
-    c.beginPath(); c.arc(sx, 394, 7, 0, 7); c.fill();
+  const bg = ASSETS.img('title-bg');
+  if (bg) {
+    /* generated art, with a slow drift so the menu is never still */
+    drawCover(c, bg, -30 - Math.sin(t * 0.15) * 14, -16, W + 60, H + 32);
+  } else {
+    drawEastRoomBg(c, t, 'title');
+    drawTable(c, t);
+    /* tiny standing silhouettes */
+    for (let i = 0; i < 6; i++) {
+      const sx = 240 + i * 150 + Math.sin(t * 0.5 + i) * 3;
+      c.fillStyle = 'rgba(10,12,20,0.85)';
+      c.beginPath(); c.ellipse(sx, 428, 9, 26, 0, 0, 7); c.fill();
+      c.beginPath(); c.arc(sx, 394, 7, 0, 7); c.fill();
+    }
   }
   /* dusk vignette */
   c.fillStyle = 'rgba(7,9,15,0.55)'; c.fillRect(0, 0, W, H);
@@ -125,6 +131,7 @@ function drawTitle(c, t) {
   uiBtn(W / 2 - 110, 320, 220, 52, 'PLAY', 'PLAY', true);
   uiBtn(W / 2 - 110, 386, 220, 44, 'CAST', 'CAST');
   uiBtn(W / 2 - 110, 442, 220, 44, 'HOW', 'HOW TO PLAY');
+  uiBtn(W / 2 - 110, 498, 220, 36, 'INTRO', 'WATCH THE INTRO');
   c.fillStyle = 'rgba(245,239,221,0.35)'; c.font = '11px Georgia, serif';
   c.fillText('A satire. Any resemblance to actual accords is purely tremendous.', W / 2, H - 22);
 }
@@ -215,6 +222,14 @@ function drawHow(c, t) {
   uiBtn(W / 2 - 70, H - 62, 140, 40, 'back_title', 'BACK');
 }
 
+/* Is this person talking right now? (their line is still being typed) */
+function isSpeaking(id) {
+  const tk = G.talk;
+  if (G.screen !== 'talk' || !tk || tk.id !== id || tk.phase !== 'lines') return false;
+  const cur = tk.lines[tk.lineIdx] || '';
+  return tk.typeT * 34 < cur.length;
+}
+
 /* ---- THE ROOM (playable) ---- */
 function drawRoom(c, t, dt) {
   /* camera eases toward the player */
@@ -239,7 +254,7 @@ function drawRoom(c, t, dt) {
     { id:'tombrown', x: 1262, y: 644, talk: true }
   ];
   for (const wd of walkers) {
-    drawFigure(c, wd.id, wd.x, wd.y, 1.15, { pose: 'stand', look: Math.sin(t * 0.7 + wd.x) });
+    drawFigure(c, wd.id, wd.x, wd.y, 1.15, { pose: 'stand', look: Math.sin(t * 0.7 + wd.x), t: t, talk: wd.id === 'tombrown' && isSpeaking('tombrown') });
     if (wd.talk) {
       HOTRECTS.push({ x: wd.x - 30, y: wd.y - 130, w: 60, h: 140, id: 'npc_tombrown' });
       const near = Math.abs(G.playerX * W - wd.x) < 80;
@@ -260,7 +275,8 @@ function drawRoom(c, t, dt) {
     drawFigure(c, s.id, px2, 500, 1.6, {
       pose: isTrump ? 'point' : 'sit',
       look: Math.max(-1, Math.min(1, (G.playerX * W - px2) / 200)),
-      blink: Math.sin(t * 0.9 + s.x * 9) > 0.985
+      blink: Math.sin(t * 0.9 + s.x * 9) > 0.985,
+      t: t, talk: isSpeaking(s.id), exp: G.talk && G.talk.id === s.id ? G.talk.react : null
     });
     /* talked badge */
     if (talked && !isTrump) {
@@ -300,12 +316,14 @@ function drawRoom(c, t, dt) {
   const pxx = G.playerX * W;
   const walking = Math.abs(G.vx) > 4;
   G.walkPhase = walking ? G.walkPhase + Math.abs(G.vx) * 0.045 : 0;
-  drawFigure(c, 'player', pxx, 662, 1.5, {
+  if (walking) G.facing = G.vx < 0 ? -1 : 1;
+  drawFigure(c, G.playerId || 'player', pxx, 662, 1.5, {
     pose: walking ? 'walk' : 'stand',
     phase: G.walkPhase,
-    flip: G.vx < -4,
+    flip: (G.facing || 1) < 0,
     look: Math.sin(t * 0.8) * 0.5,
-    blink: Math.sin(t * 1.1) > 0.99
+    blink: Math.sin(t * 1.1) > 0.99,
+    t: t
   });
   c.restore();
   drawHUD(c);
@@ -371,7 +389,7 @@ function drawTalk(c, t, dt) {
   c.fillStyle = '#0e1830'; c.beginPath(); c.arc(mx, my, 58, 0, 7); c.fill();
   c.strokeStyle = PAL.gold; c.lineWidth = 3; c.beginPath(); c.arc(mx, my, 58, 0, 7); c.stroke();
   c.save(); c.beginPath(); c.arc(mx, my, 55, 0, 7); c.clip();
-  drawFigure(c, who.id, mx, my + 56, 1.25, { pose: 'stand', blink: Math.sin(t * 0.9) > 0.985 });
+  drawFigure(c, who.id, mx, my + 56, 1.25, { pose: 'stand', blink: Math.sin(t * 0.9) > 0.985, t: t, talk: isSpeaking(tk.id), exp: tk.react });
   c.restore();
   /* speaker name */
   c.fillStyle = PAL.ink; c.font = 'bold 21px Georgia, serif'; c.textAlign = 'left';
@@ -571,7 +589,8 @@ function drawEnd(c, t) {
   c.fillStyle = '#080a10'; rr(c, fx - 14, fy - 14, fw + 28, fh + 28, 6); c.fill();
   c.strokeStyle = PAL.gold; c.lineWidth = 3; rr(c, fx - 14, fy - 14, fw + 28, fh + 28, 6); c.stroke();
   c.save(); rr(c, fx, fy, fw, fh, 3); c.clip();
-  drawEndingArt(c, t, e.art, fx, fy, fw, fh);
+  const still = ASSETS.img('end-' + G.endingId);
+  if (still) drawCover(c, still, fx, fy, fw, fh); else drawEndingArt(c, t, e.art, fx, fy, fw, fh);
   c.restore();
   c.fillStyle = 'rgba(245,239,221,0.6)'; c.font = '12px Georgia, serif'; c.textAlign = 'center';
   c.fillText(e.art.toUpperCase() + ' — ' + e.title, fx + fw / 2, fy + fh + 36);

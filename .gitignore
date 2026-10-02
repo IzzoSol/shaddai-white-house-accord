@@ -3,3 +3,7 @@ test/browser-selftest.html
 src/all.js
 src/harness-check.js
 *.log
+
+# keys and generated art stay out of git history
+.env
+.env.local

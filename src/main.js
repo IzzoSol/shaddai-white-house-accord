@@ -37,6 +37,13 @@ const G = {
 };
 let cam = 0;
 let ROTATE_OK = false;
+let lastDrawnScreen = 'title', fadeT = 1;   /* screen fade: 0 = black, 0.4 = clear */
+
+/* Which screen changes fade through black. Opening a conversation or a micro-game does not. */
+function needsFade(prev, next) {
+  if (prev === next) return false;
+  return !(next === 'talk' || prev === 'talk' || next === 'mini' || prev === 'mini');
+}
 let stateFlags = G.flags;   // alias used by mini.js
 let UNLOCKED = { trump: false };
 try {
@@ -221,6 +228,7 @@ function chooseReply(i) {
   if (rep.residue) for (const k in rep.residue) G.ledger[k] += rep.residue[k];
   if (rep.flag) G.flags[rep.flag] = true;
   if (rep.toast) toast(rep.toast);
+  tk.react = rep.r >= 6 ? 'grin' : rep.r < 0 ? 'wince' : 'smile';   /* shown while the micro-game opens */
   if (rep.r >= 0) sfx('good'); else sfx('bad');
   if (tk.mini) { G.screen = 'mini'; startMini(tk.mini); }
   else endTalk();
@@ -277,8 +285,10 @@ let ambientDone = {};
 
 /* ---- update ---- */
 function update(dt) {
+  fadeT += dt;              /* fades finish even if the game is paused mid-fade */
   if (G.paused) return;
   G.t += dt;
+  if (G.screen === 'cutscene') { updateCutscene(dt); return; }
   if (G.screen === 'room') {
     G.roomT += dt;
     const left = keys['arrowleft'] || keys['a'], right = keys['arrowright'] || keys['d'];
@@ -318,6 +328,7 @@ function update(dt) {
 
 /* ---- draw ---- */
 function draw() {
+  if (G.screen !== lastDrawnScreen) { if (needsFade(lastDrawnScreen, G.screen)) fadeT = 0; lastDrawnScreen = G.screen; }
   HOTRECTS.length = 0;
   ctx.clearRect(0, 0, W, H);
   switch (G.screen) {
@@ -332,9 +343,11 @@ function draw() {
       break;
     case 'sign': drawSign(ctx, G.t, lastDt); break;
     case 'gaggle': drawGaggle(ctx, G.t, lastDt); break;
+    case 'cutscene': drawCutscene(ctx, G.t); break;
     case 'end': drawEnd(ctx, G.t); break;
   }
   if (G.paused && (G.screen === 'room' || G.screen === 'talk')) drawPause(ctx, G.t);
+  if (fadeT < 0.4) { ctx.fillStyle = 'rgba(5,7,13,' + (1 - fadeT / 0.4) + ')'; ctx.fillRect(0, 0, W, H); }
   /* portrait phones: the stage is landscape, so say so (once) */
   if (!ROTATE_OK && window.innerHeight > window.innerWidth * 1.15) {
     ctx.fillStyle = 'rgba(7,10,18,0.9)'; ctx.fillRect(0, 0, W, H);
@@ -360,13 +373,15 @@ function handleClicks() {
     if (clicked('rotate_ok')) ROTATE_OK = true;
     return;
   }
+  if (G.screen === 'cutscene') { if (CLICKS.length) skipCutscene(); return; }
   if (G.paused) {
     if (clicked('resume')) { G.paused = false; sfx('ui'); }
     else if (clicked('quit_title')) { G.paused = false; G.screen = 'title'; G.talk = null; sfx('ui'); }
     return;
   }
   if (G.screen === 'title') {
-    if (clicked('PLAY')) { G.screen = 'cast'; sfx('ui'); }
+    if (clicked('PLAY')) { if (introSeen()) G.screen = 'cast'; else startCutscene('arrival'); sfx('ui'); }
+    if (clicked('INTRO')) { startCutscene('arrival'); sfx('ui'); }
     if (clicked('CAST')) { G.screen = 'cast'; sfx('ui'); }
     if (clicked('HOW')) { G.screen = 'how'; sfx('ui'); }
   } else if (G.screen === 'cast') {
@@ -382,7 +397,7 @@ function handleClicks() {
       if (s.id === G.playerId) continue;
       if (clicked('npc_' + s.id)) {
         if (s.id === 'trump') {
-          if (G.talksDone.length >= 3) startSign();
+          if (G.talksDone.length >= 3) startCutscene('desk');
           else toast('The pen comes at the signing. Mingle first.');
         } else if (G.talksDone.length >= 3 && G.talksDone.indexOf(s.id) === -1) {
           toast('Three conversations is the rule. The pen is up.');
@@ -438,6 +453,7 @@ window.addEventListener('keydown', function (e) {
     if (G.screen === 'room' || G.screen === 'talk') G.paused = !G.paused;
   }
   if (k === 'm') toggleMute();
+  if (G.screen === 'cutscene' && (k === ' ' || k === 'enter' || k === 'escape')) { e.preventDefault(); skipCutscene(); }
   if (G.screen === 'talk' && G.talk && !G.paused) {
     if ((k === '1' || k === '2') && G.talk.phase === 'replies' && G.talk.replies[+k - 1]) chooseReply(+k - 1);
     else if (k === ' ' || k === 'enter') { e.preventDefault(); CLICKS.push({ x: 2, y: 2 }); }

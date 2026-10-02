@@ -339,5 +339,6 @@ function shareCard(state) {
     absentCEO: 'Dots are here. The lunch happened. These facts are related.',
     perfect: 'The Golden Age of Super Intelligence has begun. Tremendous.'
   }[state.endingId];
-  return { who: who, txt: txt, likes: (12 + Math.floor(RND() * 88)) * (L.meme >= 3 ? 1000 : 100) + 'K' };
+  const k = (12 + Math.floor(RND() * 88)) * (L.meme >= 3 ? 1000 : 100);   /* in thousands */
+  return { who: who, txt: txt, likes: k >= 1000 ? (k / 1000).toFixed(1) + 'M' : k + 'K' };
 }

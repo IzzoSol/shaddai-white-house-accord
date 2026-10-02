@@ -11,6 +11,12 @@ function finishMini(success, residue, toast) {
   mini.success = success; mini.residue = residue || {}; mini.toast = toast || ''; mini.done = true;
 }
 
+/* The window every micro-game plays in. Positions inside a micro-game are relative to this. */
+function miniPanel() {
+  const pw = Math.min(760, W * 0.72), ph = Math.min(430, H * 0.72);
+  return { pw: pw, ph: ph, px: (W - pw) / 2, py: (H - ph) / 2 };
+}
+
 /* ---- shared chrome ---- */
 function drawMiniShell(c, W, H, t) {
   c.fillStyle = 'rgba(7,10,18,0.72)'; c.fillRect(0, 0, W, H);
@@ -18,10 +24,10 @@ function drawMiniShell(c, W, H, t) {
   const px = (W - pw) / 2, py = (H - ph) / 2;
   c.fillStyle = PAL.cream; rr(c, px, py, pw, ph, 10); c.fill();
   c.strokeStyle = PAL.gold; c.lineWidth = 2.5; rr(c, px, py, pw, ph, 10); c.stroke();
-  c.fillStyle = PAL.ink; c.font = 'bold 21px Georgia, serif'; c.textAlign = 'left';
-  c.fillText(mini.title, px + 24, py + 38);
-  c.fillStyle = '#5a4a38'; c.font = '14px Georgia, serif';
-  c.fillText(mini.how, px + 24, py + 60);
+  c.fillStyle = PAL.ink; c.font = 'bold 24px Georgia, serif'; c.textAlign = 'left';
+  c.fillText(mini.title, px + 24, py + 40);
+  c.fillStyle = '#4a3a28'; c.font = '16px Georgia, serif';
+  wrapText(c, mini.how, px + 24, py + 66, pw - 48, 20, 'left');
   /* time bar */
   const frac = 1 - Math.min(1, mini.elapsed / mini.time);
   c.fillStyle = '#d9cfae'; rr(c, px + 24, py + ph - 26, pw - 48, 10, 5); c.fill();
@@ -80,9 +86,9 @@ const MINI = {
       c.fillStyle = '#fff'; c.font = 'bold 10px monospace'; c.textAlign = 'center';
       c.fillText(mini.picked >= 0 ? 'POST' : 'PICK A DRAFT', pr.x + pr.w / 2, pr.y + 11);
       /* Elon watching */
-      drawFigure(c, 'musk', b.px + b.pw - 120, b.py + b.ph - 40, 1.35, { pose: 'stand', look: Math.sin(t * 1.4) });
+      drawFigure(c, 'musk', b.px + b.pw - 120, b.py + b.ph - 86, 1.35, { pose: 'stand', look: Math.sin(t * 1.4) });
       c.fillStyle = '#5a4a38'; c.font = 'italic 13px Georgia, serif'; c.textAlign = 'center';
-      c.fillText(mini.posted ? '“Historic.”' : '“Probably.”', b.px + b.pw - 120, b.py + b.ph - 66);
+      c.fillText(mini.posted ? '“Historic.”' : '“Probably.”', b.px + b.pw - 120, b.py + b.ph - 200);
     }
   },
 
@@ -138,9 +144,9 @@ const MINI = {
       if (mini.hold > 0.05) {
         c.fillStyle = PAL.gold; rr(c, tx, ty - 44, tw * (mini.hold / 1.6), 6, 3); c.fill();
       }
-      drawFigure(c, 'huang', b.px + b.pw - 110, b.py + b.ph - 40, 1.3, { pose: 'stand' });
+      drawFigure(c, 'huang', b.px + b.pw - 110, b.py + b.ph - 86, 1.3, { pose: 'stand' });
       c.fillStyle = '#5a4a38'; c.font = 'italic 13px Georgia, serif'; c.textAlign = 'center';
-      c.fillText(mini.station === 0 ? '“Sand.”' : mini.station === 1 ? '“Wafer.”' : '“Software.”', b.px + b.pw - 110, b.py + b.ph - 66);
+      c.fillText(mini.station === 0 ? '“Sand.”' : mini.station === 1 ? '“Wafer.”' : '“Software.”', b.px + b.pw - 110, b.py + b.ph - 200);
     }
   },
 
@@ -169,15 +175,17 @@ const MINI = {
       mini.spawn -= dt;
       if (mini.spawn <= 0 && mini.words.length < 4) {
         const w = mini.pool[Math.floor(RND() * mini.pool.length)];
-        mini.words.push({ t: w.t, wrong: w.w, x: -40, y: 0, speed: 42 + RND() * 26 });
+        const lane = (mini.laneN = (mini.laneN || 0) + 1) % 3;   /* three lanes, inside the window */
+        mini.words.push({ t: w.t, wrong: w.w, x: -30, y: lane * 44, speed: 70 + RND() * 40 });
         mini.spawn = 0.55;
       }
       for (let i = mini.words.length - 1; i >= 0; i--) {
         const wd = mini.words[i]; wd.x += wd.speed * dt;
-        const r = { x: wd.x - 34, y: 118 + wd.y, w: 68, h: 26 };
+        const P = miniPanel();
+        const r = { x: P.px + 24 + wd.x - 34, y: P.py + 128 + wd.y, w: 68, h: 26 };
         wd.rect = r;
         if (hitTest(r) && CLICKS.length) { CLICKS.pop(); if (wd.wrong) mini.wrongTapped++; else mini.opticsHit = (mini.opticsHit || 0) + 1; mini.words.splice(i, 1); continue; }
-        if (wd.x > 430) {
+        if (wd.x > miniPanel().pw - 38) {
           if (wd.wrong) { mini.wrongMissed++; mini.jumbotron.push(wd.t); }
           mini.words.splice(i, 1);
         }
@@ -190,7 +198,9 @@ const MINI = {
       c.strokeStyle = PAL.gold; c.lineWidth = 1.5; rr(c, b.px + 24, b.py + 78, b.pw - 48, 34, 4); c.stroke();
       c.fillStyle = PAL.gold; c.font = 'bold 15px monospace'; c.textAlign = 'left';
       c.fillText(mini.jumbotron.slice(-2).join(' · ') || '· · ·', b.px + 36, b.py + 101);
-      /* streaming words */
+      /* streaming words: a lane track, clipped to the window */
+      c.save(); c.beginPath(); c.rect(b.px + 24, b.py + 120, b.pw - 48, 150); c.clip();
+      for (let ln = 0; ln < 3; ln++) { c.fillStyle = 'rgba(16,24,38,0.07)'; rr(c, b.px + 24, b.py + 124 + ln * 44, b.pw - 48, 34, 8); c.fill(); }
       for (const wd of mini.words) {
         const r = wd.rect;
         c.fillStyle = '#fff'; rr(c, r.x, r.y, r.w, r.h, 13); c.fill();
@@ -198,10 +208,11 @@ const MINI = {
         c.fillStyle = '#22262c'; c.font = '13px Georgia'; c.textAlign = 'center';
         c.fillText(wd.t, r.x + r.w / 2, r.y + 17);
       }
+      c.restore();
       /* zuck wearing the glasses, watching */
-      drawFigure(c, 'zuck', b.px + b.pw - 110, b.py + b.ph - 40, 1.3, { pose: 'stand', look: Math.sin(t * 0.8) });
+      drawFigure(c, 'zuck', b.px + b.pw - 110, b.py + b.ph - 86, 1.3, { pose: 'stand', look: Math.sin(t * 0.8) });
       c.fillStyle = '#5a4a38'; c.font = 'italic 13px Georgia, serif'; c.textAlign = 'center';
-      c.fillText('“Robust.”', b.px + b.pw - 110, b.py + b.ph - 66);
+      c.fillText('“Robust.”', b.px + b.pw - 110, b.py + b.ph - 200);
       c.fillStyle = '#5a4a38'; c.font = '12px Georgia'; c.textAlign = 'left';
       c.fillText('tapped: ' + mini.wrongTapped + '   leaked: ' + mini.wrongMissed, b.px + 24, b.py + b.ph - 40);
     }
@@ -262,7 +273,7 @@ const MINI = {
       c.fillStyle = PAL.green; rr(c, mx - 26, b.py + 108, 52, 24, 4); c.fill();
       c.fillStyle = '#fff'; c.font = 'bold 10px monospace'; c.textAlign = 'center';
       c.fillText('STAMP', mx, b.py + 124);
-      drawFigure(c, 'pichai', b.px + b.pw - 60, b.py + b.ph - 36, 1.0, { pose: 'stand' });
+      drawFigure(c, 'pichai', b.px + b.pw - 60, b.py + b.ph - 72, 1.0, { pose: 'stand' });
     }
   },
 
@@ -313,9 +324,9 @@ const MINI = {
       c.fillStyle = PAL.gold; rr(c, b.px + 250, b.py + 100, 14 * (mini.held / 6), 220, 4); c.fill();
       c.fillStyle = '#5a4a38'; c.font = '12px monospace'; c.textAlign = 'left';
       c.fillText(Math.ceil(mini.held) + 's / 6s held', b.px + 250, b.py + 340);
-      drawFigure(c, 'amodei', b.px + b.pw - 110, b.py + b.ph - 40, 1.3, { pose: 'stand' });
+      drawFigure(c, 'amodei', b.px + b.pw - 110, b.py + b.ph - 86, 1.3, { pose: 'stand' });
       c.fillStyle = '#5a4a38'; c.font = 'italic 13px Georgia, serif'; c.textAlign = 'center';
-      c.fillText('“Actual ones.”', b.px + b.pw - 110, b.py + b.ph - 66);
+      c.fillText('“Actual ones.”', b.px + b.pw - 110, b.py + b.ph - 200);
     }
   },
 

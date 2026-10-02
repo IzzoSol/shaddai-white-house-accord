@@ -23,7 +23,8 @@ python -m http.server 8477
 - **Cast** — six signatory cards + Trump (locked until you finish a run).
   Your seat at the table is already a choice: Elon starts next to Trump,
   Dario starts parked at the far end, Greg starts with Sam on speaker.
-- **East Room** — walk the table with A/D or arrows, click a person to talk.
+- **East Room** — walk the table with A/D or arrows, click a person to talk (talk to three; Tom Brown at the far end is a bonus, once).
+  In a conversation press **1 / 2** to reply and **Space** to read on. **P** pauses.
   Talk to three people. Each talk ends in their micro-game:
   Elon's phone composer, Jensen's sand conveyor, Zuck's live captions,
   Sundar's stamp folders, Dario's safety slider, Greg's pen on the line.
@@ -71,3 +72,7 @@ Run the headless checks: `node test/smoke.js`
 QA discipline borrowed from majidmanzarpour/threejs-game-skills: seeded RNG,
 `__GAME_TEST_HOOKS__` test contract, canvas pixel checks, real input path,
 zero console errors.
+
+## Agents
+
+Any controller — a scripted bot, a model-driven agent, a forged Shaddai bot — can play through the game's agent interface. See `agents/README.md`.

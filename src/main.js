@@ -36,6 +36,7 @@ const G = {
   t: 0
 };
 let cam = 0;
+let ROTATE_OK = false;
 let stateFlags = G.flags;   // alias used by mini.js
 let UNLOCKED = { trump: false };
 try {
@@ -70,7 +71,7 @@ function uiBtn(x, y, w, h, id, label, primary) {
   ctx.strokeStyle = primary ? '#101b2d' : (hot2 ? PAL.gold : '#3a4a68'); ctx.lineWidth = hot2 ? 2.5 : 1.5;
   rr(ctx, x, y, w, h, 8); ctx.stroke();
   ctx.fillStyle = primary ? '#101b2d' : PAL.cream;
-  ctx.font = (primary ? 'bold 17px' : '14px') + ' Georgia, serif';
+  ctx.font = (primary ? 'bold 18px' : '15px') + ' Georgia, serif';
   ctx.textAlign = 'center';
   ctx.fillText(label, x + w / 2, y + h / 2 + (primary ? 6 : 5));
 }
@@ -85,14 +86,20 @@ function wrapCount(c, text, maxW) {
   }
   return lines;
 }
-function wrapText(c, text, x, y, maxW) {
+function wrapText(c, text, x, y, maxW, lineH, align) {
+  /* Draws wrapped text and returns the y of its last line. lineH defaults to 18. align ('left'|'center'|'right')
+     overrides the canvas alignment for this call only: x is then the left edge, centre, or right edge. */
+  lineH = lineH || 18;
+  const prev = c.textAlign;
+  if (align) c.textAlign = align;
   const words = String(text).split(' ');
   let cur = '', yy = y;
   for (const wd of words) {
     const test = cur ? cur + ' ' + wd : wd;
-    if (c.measureText(test).width > maxW && cur) { c.fillText(cur, x, yy); yy += 18; cur = wd; } else { cur = test; }
+    if (c.measureText(test).width > maxW && cur) { c.fillText(cur, x, yy); yy += lineH; cur = wd; } else { cur = test; }
   }
   if (cur) c.fillText(cur, x, yy);
+  c.textAlign = prev;
   return yy;
 }
 function wrapTextLines(c, text, maxW) {
@@ -320,6 +327,7 @@ function draw() {
     case 'room': drawRoom(ctx, G.t, lastDt); break;
     case 'talk': drawTalk(ctx, G.t, lastDt); break;
     case 'mini':
+      drawRoom(ctx, G.t, lastDt);
       if (mini) { MINI[mini.id].draw(ctx, G.t); }
       break;
     case 'sign': drawSign(ctx, G.t, lastDt); break;
@@ -327,6 +335,15 @@ function draw() {
     case 'end': drawEnd(ctx, G.t); break;
   }
   if (G.paused && (G.screen === 'room' || G.screen === 'talk')) drawPause(ctx, G.t);
+  /* portrait phones: the stage is landscape, so say so (once) */
+  if (!ROTATE_OK && window.innerHeight > window.innerWidth * 1.15) {
+    ctx.fillStyle = 'rgba(7,10,18,0.9)'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = PAL.gold2; ctx.font = '600 44px Georgia, serif'; ctx.textAlign = 'center';
+    ctx.fillText('Best played sideways', W / 2, H / 2 - 40);
+    ctx.fillStyle = PAL.cream; ctx.font = '26px Georgia, serif';
+    ctx.fillText('Rotate your phone for the full room.', W / 2, H / 2 + 8);
+    uiBtn(W / 2 - 130, H / 2 + 50, 260, 56, 'rotate_ok', 'PLAY ANYWAY', true);
+  }
   /* mute toggle in the corner */
   const mb = { x: W - 34, y: H - 30, w: 24, h: 22 };
   HOTRECTS.push({ x: mb.x, y: mb.y, w: mb.w, h: mb.h, id: 'mute' });
@@ -339,6 +356,15 @@ function draw() {
 
 /* ---- click handling (immediate mode, after draw registers rects) ---- */
 function handleClicks() {
+  if (!ROTATE_OK && window.innerHeight > window.innerWidth * 1.15) {
+    if (clicked('rotate_ok')) ROTATE_OK = true;
+    return;
+  }
+  if (G.paused) {
+    if (clicked('resume')) { G.paused = false; sfx('ui'); }
+    else if (clicked('quit_title')) { G.paused = false; G.screen = 'title'; G.talk = null; sfx('ui'); }
+    return;
+  }
   if (G.screen === 'title') {
     if (clicked('PLAY')) { G.screen = 'cast'; sfx('ui'); }
     if (clicked('CAST')) { G.screen = 'cast'; sfx('ui'); }
@@ -412,6 +438,10 @@ window.addEventListener('keydown', function (e) {
     if (G.screen === 'room' || G.screen === 'talk') G.paused = !G.paused;
   }
   if (k === 'm') toggleMute();
+  if (G.screen === 'talk' && G.talk && !G.paused) {
+    if ((k === '1' || k === '2') && G.talk.phase === 'replies' && G.talk.replies[+k - 1]) chooseReply(+k - 1);
+    else if (k === ' ' || k === 'enter') { e.preventDefault(); CLICKS.push({ x: 2, y: 2 }); }
+  } else if (G.screen === 'sign' && !G.paused && (k === ' ' || k === 'enter')) { e.preventDefault(); CLICKS.push({ x: 2, y: 2 }); }
   if (k === 'escape' && G.screen === 'talk') { G.talk = null; G.screen = 'room'; }
 });
 window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });

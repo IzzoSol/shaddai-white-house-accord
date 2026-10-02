@@ -1430,6 +1430,13 @@ function drawHUD(c) {
   rr(c, W / 2 - ow / 2, 14, ow, 30, 8); c.fill();
   c.fillStyle = PAL.gold2; c.textAlign = 'center';
   c.fillText(obj, W / 2, 34);
+  /* the press clock */
+  if (G.human && !G.sealed) {
+    const m = Math.floor(G.clock / 60), sec = Math.floor(G.clock % 60), low = G.clock < 30;
+    c.fillStyle = low ? 'rgba(120,20,20,0.85)' : 'rgba(7,10,18,0.7)'; rr(c, W - 262, 14, 156, 30, 8); c.fill();
+    c.fillStyle = low ? '#ffb0a8' : PAL.gold2; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('PRESS IN ' + m + ':' + (sec < 10 ? '0' : '') + sec, W - 184, 34);
+  }
   /* pause hint */
   c.fillStyle = 'rgba(7,10,18,0.7)';
   rr(c, W - 96, 14, 82, 30, 8); c.fill();
@@ -1684,6 +1691,7 @@ function drawAuraReport(c, rx, rw) {
 }
 
 function drawEnd(c, t) {
+  if (!G.scored) finishRun();
   const e = ENDINGS[G.endingId];
   const g = c.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#0c1220'); g.addColorStop(1, '#101b2d');
@@ -1701,9 +1709,11 @@ function drawEnd(c, t) {
   /* title */
   const rx = fx + fw + 56, rw = W - rx - 56;
   c.fillStyle = PAL.gold2; c.font = '600 38px Georgia, serif'; c.textAlign = 'left';
-  if (G.endTab !== 'aura') c.fillText(e.title, rx, 112);
+  if (G.endTab === 'story') c.fillText(e.title, rx, 112);
   if (G.endTab === 'aura') {
     drawAuraReport(c, rx, rw);
+  } else if (G.endTab === 'board') {
+    drawBoard(c, rx, rw);
   } else {
     /* the story: each line starts where the last one ended, so wrapped lines never overlap */
     let y = 152;
@@ -1713,8 +1723,8 @@ function drawEnd(c, t) {
       y = wrapText(c, l, rx, y, rw, 22, 'left') + 36;
     });
     /* share card: fake X post, placed under the story */
-    const sc = shareCard(G);
-    const sw2 = Math.min(460, rw), sh2 = 96, sx2 = rx, sy2 = Math.max(y - 8, 392);
+    const sc = currentPost();
+    const sw2 = Math.min(560, rw), sh2 = 96, sx2 = rx, sy2 = Math.max(y - 8, 380);
     c.fillStyle = '#0c1320'; rr(c, sx2, sy2, sw2, sh2, 10); c.fill();
     c.strokeStyle = '#26365a'; c.lineWidth = 1.5; rr(c, sx2, sy2, sw2, sh2, 10); c.stroke();
     c.fillStyle = '#e8c96a'; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'left';
@@ -1723,12 +1733,20 @@ function drawEnd(c, t) {
     wrapText(c, sc.txt, sx2 + 16, sy2 + 48, sw2 - 32, 18, 'left');
     c.fillStyle = '#8a9bb0'; c.font = '12px Georgia, serif';
     c.fillText('♥ ' + sc.likes + '   the internet reacts', sx2 + 16, sy2 + sh2 - 12);
+    /* pick your post */
+    c.fillStyle = PAL.gold2; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'left';
+    c.fillText('CHOOSE YOUR POST', rx, sy2 + sh2 + 28);
+    const ow = Math.floor((rw - 24) / 3);
+    POST_TONES.forEach((p, i) => uiBtn(rx + i * (ow + 12), sy2 + sh2 + 38, ow, 38, 'post_' + i, p.label, G.postPick === i));
+    uiBtn(rx, sy2 + sh2 + 86, 190, 38, 'post_go', 'POST TO X  ↗', true);
+    uiBtn(rx + 202, sy2 + sh2 + 86, 150, 38, 'post_copy', G.copied ? 'COPIED' : 'COPY TEXT');
   }
   /* buttons */
   const by = 632;
-  uiBtn(rx, by, 160, 44, 'again', 'PLAY AGAIN');
-  uiBtn(rx + 172, by, 200, 44, 'another', 'TRY ANOTHER CEO');
-  uiBtn(rx + 384, by, 190, 44, 'tab_aura', G.endTab === 'aura' ? 'SHOW THE STORY' : 'AURA REPORT', G.endTab !== 'aura');
+  uiBtn(rx, by, 120, 44, 'again', 'PLAY AGAIN');
+  uiBtn(rx + 130, by, 170, 44, 'another', 'ANOTHER CEO');
+  uiBtn(rx + 310, by, 170, 44, 'tab_aura', G.endTab === 'aura' ? 'THE STORY' : 'AURA REPORT', G.endTab !== 'aura');
+  uiBtn(rx + 490, by, 170, 44, 'tab_board', G.endTab === 'board' ? 'THE STORY' : 'LEADERBOARD', G.endTab !== 'board');
 }
 
 /* ---- ending art variants ---- */
@@ -2295,6 +2313,11 @@ function worldUpdate(dt) {
     if (dd > 3) { const sp = Math.min(dd, 38 * dt); n.x += ddx / dd * sp; n.y += ddy / dd * sp; n.walking = true; if (Math.abs(ddx) > 2) n.face = ddx < 0 ? -1 : 1; } else n.walking = false;
   }
 
+  if (G.human && !G.sealed) {
+    G.clock -= dt;
+    if (G.clock <= 0) { G.clock = 0; G.sealed = true; toast('The press conference is starting. Everyone to the lawn!'); startPressConference(true); return; }
+  }
+  if (G.human && !G.doorHint && G.roomT > 7) { G.doorHint = true; toast('Doors: far left = the Gallery, far right = the South Lawn. Click one or walk into it.'); }
   /* what is in front of you */
   const targets = worldTargets();
   let best = null, bd = 1e9;
@@ -2303,7 +2326,7 @@ function worldUpdate(dt) {
     if (d < t.r && d < bd) { best = t; bd = d; }
   }
   G.focus = best;
-  if (best && best.kind === 'portal' && !busy && Math.hypot(best.x - G.px, best.y - G.py) < 30) { enterZone(best.portal.to, best.portal.at); return; }
+  if (best && best.kind === 'portal' && !busy && Math.hypot(best.x - G.px, (best.y - G.py) * 0.8) < 48) { enterZone(best.portal.to, best.portal.at); return; }
 
   /* handshake timing window */
   if (G.hs) updateHandshake(dt);
@@ -2423,6 +2446,7 @@ function worldClick(sx, sy) {
   const targets = worldTargets();
   let hit = null, bd = 1e9;
   for (const t of targets) {
+    if (t.kind === 'portal' && Math.abs(wx - t.x) < 90 && wy > t.y - 520 && wy < t.y + 80) { hit = t; bd = 0; break; }
     const body = t.person ? 70 : (t.kind === 'portrait' ? 130 : 90);
     const cy = t.person ? t.y - 60 : (t.kind === 'portrait' ? 330 : t.y - 40);
     const d = Math.hypot(t.x - wx, (cy - wy) * (t.kind === 'portrait' ? 0.6 : 1));
@@ -2821,8 +2845,18 @@ const PRESS_TIME = 12;
 
 function pressReporterName(id) { return (PRESS_BOTS[id] || AMBIENT_PEOPLE[id] || { name: 'Reporter' }); }
 
-function startPressConference() {
+function startPressConference(final) {
   G.press = G.press || { used: {}, sessions: 0 };
+  if (final) {
+    /* the finale: four questions, full value, unused ones first */
+    const pool = PRESS_QUESTIONS.slice().sort((a, b) => ((G.press.used[a.id] ? 1 : 0) - (G.press.used[b.id] ? 1 : 0)) || (idHash(a.id + 'f' + G.t) - idHash(b.id + 'f' + G.t)));
+    const mine = pool.filter((q) => q.home === G.playerId && !G.press.used[q.id]).slice(0, 1);
+    const qs = mine.concat(pool.filter((q) => mine.indexOf(q) < 0)).slice(0, 4);
+    G.press.session = { qs: qs, i: 0, t: 0, answered: null, total: 0, mult: 1, final: true };
+    G.press.sessions++;
+    G.sealed = true; G.screen = 'press'; sfx('shutter');
+    return;
+  }
   const fresh = PRESS_QUESTIONS.filter((q) => !G.press.used[q.id]);
   if (fresh.length < 1) { toast('The press corps has no questions left. You have survived the lawn.'); return; }
   /* three questions: your home turf first, then the rest in a repeatable shuffle */
@@ -2860,6 +2894,7 @@ function pressTimeout() {
 function pressNext() {
   const ses = G.press.session;
   ses.i++; ses.answered = null; ses.t = 0;
+  if (ses.i >= ses.qs.length && ses.final) { G.press.session = null; finishRun(); return; }
   if (ses.i >= ses.qs.length) { G.screen = 'room'; G.press.session = null; toast('You handled the press. The riser applauds, politely.'); }
 }
 function updatePress(dt) {
@@ -2889,6 +2924,7 @@ function drawPress(c, t) {
   c.fillStyle = 'rgba(245,239,221,0.7)'; c.font = '12px Georgia'; c.fillText(rep.co || '', 150, 332);
   /* question */
   c.fillStyle = PAL.cream; rr(c, 290, 120, 950, 120, 12); c.fill(); c.strokeStyle = PAL.gold; c.lineWidth = 2.5; rr(c, 290, 120, 950, 120, 12); c.stroke();
+  if (ses.final) { c.fillStyle = PAL.gold2; c.font = 'bold 15px Georgia, serif'; c.textAlign = 'center'; c.fillText('★  THE FINAL PRESS CONFERENCE  ★  your score is decided here', W / 2, 104); }
   c.fillStyle = '#6a5a44'; c.font = 'bold 12px Georgia'; c.textAlign = 'left'; c.fillText('QUESTION ' + (ses.i + 1) + ' OF ' + ses.qs.length + ' · ' + q.topic.toUpperCase(), 312, 146);
   c.fillStyle = PAL.ink; c.font = 'italic 21px Georgia'; wrapText(c, q.q, 312, 178, 906, 28, 'left');
   /* clock */
@@ -2916,6 +2952,88 @@ function drawPress(c, t) {
     c.fillStyle = PAL.cream; c.font = 'italic 18px Georgia'; wrapText(c, r.line, 314, 618, 900, 24, 'left');
   } else { c.fillStyle = 'rgba(245,239,221,0.6)'; c.font = '14px Georgia'; c.textAlign = 'center'; c.fillText('Press 1, 2 or 3 — or click. Match the tone to the question.', 765, 690); }
   drawHUD(c);
+}
+
+/* ==================== finale.js ==================== */
+/* The finale: the press clock, the score, the leaderboard, and the post you send out afterwards. */
+const ROUND_SECONDS = 360;
+const BOARD_KEY = 'wh_board';
+const POST_TONES = [
+  { id: 'humble', label: 'HUMBLE' },
+  { id: 'hype',   label: 'HYPE' },
+  { id: 'meme',   label: 'MEME' }
+];
+
+function loadBoard() {
+  try { const b = JSON.parse(localStorage.getItem(BOARD_KEY) || '[]'); return Array.isArray(b) ? b : []; } catch (e) { return []; }
+}
+function saveBoard(b) { try { localStorage.setItem(BOARD_KEY, JSON.stringify(b)); } catch (e) {} }
+
+/* called once when a run ends, however it ends */
+function finishRun() {
+  if (G.scored) return;
+  G.scored = true;
+  if (G.screen !== 'end') { G.endingId = computeEndingId(G); G.screen = 'end'; }
+  G.endTab = G.human ? 'aura' : 'story';
+  G.boardRank = -1;
+  if (!G.human) return;
+  const R = auraReport();
+  const me = CAST.find((k) => k.id === G.playerId);
+  const entry = { n: me ? me.name : G.playerId, s: R.score, r: R.rank, e: ENDINGS[G.endingId].title, d: Date.now() };
+  const board = loadBoard();
+  board.push(entry);
+  board.sort((a, b) => b.s - a.s || a.d - b.d);
+  const top = board.slice(0, 10);
+  G.boardRank = top.indexOf(entry);
+  saveBoard(top);
+  G.share = null;
+}
+
+function currentPost() {
+  if (!G.share) G.share = shareCard(G);
+  const R = auraReport(), tone = POST_TONES[G.postPick].id;
+  const me = CAST.find((k) => k.id === G.playerId), who = me ? me.name : 'a CEO';
+  const e = ENDINGS[G.endingId];
+  let txt;
+  if (tone === 'humble') txt = 'Survived the White House AI Accord lunch as ' + who + '. Aura rank ' + R.rank + ' (' + R.title.toLowerCase() + '). Ending: ' + e.title + '.';
+  else if (tone === 'hype') txt = R.rank + '-rank aura. ' + R.score + ' points. "' + e.title + '." The Accord is signed and I was in the room. Beat that.';
+  else txt = G.share.txt + ' #AccordLunch';
+  return { who: tone === 'meme' ? G.share.who : '@you', txt: txt, likes: G.share.likes };
+}
+function openXPost() {
+  const p = currentPost();
+  let link = '';
+  try { if (/^https?:/.test(location.href)) link = location.href.split('#')[0]; } catch (e) {}
+  const url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(p.txt) + (link ? '&url=' + encodeURIComponent(link) : '');
+  try { window.open(url, '_blank', 'noopener'); } catch (e) {}
+  sfx('good');
+}
+function copyXPost() {
+  const p = currentPost();
+  try { navigator.clipboard.writeText(p.txt); G.copied = true; setTimeout(() => { G.copied = false; }, 1800); } catch (e) {}
+  sfx('ui');
+}
+
+function drawBoard(c, rx, rw) {
+  const board = loadBoard();
+  c.fillStyle = PAL.gold2; c.font = '600 22px Georgia, serif'; c.textAlign = 'left';
+  c.fillText('LEADERBOARD', rx, 142);
+  c.fillStyle = 'rgba(245,239,221,0.55)'; c.font = '13px Georgia, serif';
+  c.fillText('Best runs on this device', rx + 215, 142);
+  if (!board.length) { c.fillStyle = PAL.cream; c.font = '16px Georgia, serif'; c.fillText('No finished runs yet.', rx, 190); return; }
+  board.forEach((b, i) => {
+    const y = 176 + i * 40, me = i === G.boardRank;
+    c.fillStyle = me ? 'rgba(201,162,39,0.22)' : 'rgba(245,239,221,0.05)'; rr(c, rx, y, rw, 34, 8); c.fill();
+    if (me) { c.strokeStyle = PAL.gold; c.lineWidth = 1.5; rr(c, rx, y, rw, 34, 8); c.stroke(); }
+    c.textBaseline = 'middle';
+    c.fillStyle = i < 3 ? PAL.gold2 : 'rgba(245,239,221,0.6)'; c.font = 'bold 16px Georgia, serif'; c.textAlign = 'left'; c.fillText('#' + (i + 1), rx + 14, y + 18);
+    c.fillStyle = PAL.cream; c.font = 'bold 15px Georgia, serif'; c.fillText(b.n, rx + 66, y + 18);
+    c.fillStyle = 'rgba(245,239,221,0.6)'; c.font = '13px Georgia, serif'; c.fillText(b.e, rx + 250, y + 18);
+    c.fillStyle = PAL.gold2; c.font = 'bold 15px Georgia, serif'; c.textAlign = 'right'; c.fillText(b.s + ' pts', rx + rw - 62, y + 18);
+    c.fillStyle = { S: '#7ef0a8', A: '#c9e86a', B: PAL.gold2, C: '#f0b070', D: '#ff9a90' }[b.r] || PAL.cream; c.fillText(b.r, rx + rw - 18, y + 18);
+    c.textBaseline = 'alphabetic';
+  });
+  if (G.boardRank >= 0) { c.fillStyle = PAL.gold2; c.font = 'italic 14px Georgia, serif'; c.textAlign = 'left'; c.fillText('You placed #' + (G.boardRank + 1) + '.', rx, 590); }
 }
 
 /* ==================== main.js ==================== */
@@ -3110,6 +3228,7 @@ function resetRun(playerId) {
   }
   worldReset(playerId);
   G.press = null; G.endTab = 'story';
+  G.clock = ROUND_SECONDS; G.sealed = false; G.scored = false; G.share = null; G.postPick = 0; G.human = false; G.doorHint = false;
 }
 
 function startGame(id) {
@@ -3244,8 +3363,9 @@ function update(dt) {
     const beats = gaggleBeats(G.flags, G.ledger);
     if (G.gaggleT > beats.length * 5.5 + 1) {
       G.endingId = computeEndingId(G);
-      G.screen = 'end';
       sfx('sign');
+      if (G.human) { G.screen = 'room'; G.zone = 'lawn'; enterZone('lawn', { x: 640, y: 1330 }); startPressConference(true); }
+      else G.screen = 'end';
     }
   }
 }
@@ -3311,8 +3431,8 @@ function handleClicks() {
     if (clicked('HOW')) { G.screen = 'how'; sfx('ui'); }
   } else if (G.screen === 'cast') {
     for (const k of CAST) {
-      if (k.starter && clicked('pick_' + k.id)) { startGame(k.id); return; }
-      if (k.locked && UNLOCKED.trump && clicked('pick_' + k.id)) { startGame(k.id); return; }
+      if (k.starter && clicked('pick_' + k.id)) { startGame(k.id); G.human = true; return; }
+      if (k.locked && UNLOCKED.trump && clicked('pick_' + k.id)) { startGame(k.id); G.human = true; return; }
     }
     if (clicked('back_title')) { G.screen = 'title'; sfx('ui'); }
   } else if (G.screen === 'how') {
@@ -3351,9 +3471,13 @@ function handleClicks() {
       if (clicked('mic_nobody')) { pickMic('nobody'); return; }
     }
   } else if (G.screen === 'end') {
-    if (clicked('again')) { UNLOCKED.trump = true; saveUnlocks(); startGame(G.playerId); return; }
+    if (clicked('again')) { UNLOCKED.trump = true; saveUnlocks(); startGame(G.playerId); G.human = true; return; }
     if (clicked('another')) { UNLOCKED.trump = true; saveUnlocks(); G.screen = 'cast'; return; }
     if (clicked('tab_aura')) { G.endTab = G.endTab === 'aura' ? 'story' : 'aura'; sfx('ui'); return; }
+    if (clicked('tab_board')) { G.endTab = G.endTab === 'board' ? 'story' : 'board'; sfx('ui'); return; }
+    for (let i = 0; i < 3; i++) if (clicked('post_' + i)) { G.postPick = i; sfx('ui'); return; }
+    if (clicked('post_go')) { openXPost(); return; }
+    if (clicked('post_copy')) { copyXPost(); return; }
   }
   if (clicked('mute')) toggleMute();
 }

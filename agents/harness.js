@@ -7,7 +7,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
-const PARTS = ['data.js', 'art.js', 'mini.js', 'scenes.js', 'assets.list.js', 'assets.js', 'cutscene.js', 'world.js', 'press.js', 'main.js', 'agent.js'];
+const PARTS = ['data.js', 'art.js', 'mini.js', 'scenes.js', 'assets.list.js', 'assets.js', 'cutscene.js', 'world.js', 'press.js', 'finale.js', 'main.js', 'agent.js'];
 
 function stubContext() {
   return new Proxy({}, {

@@ -189,6 +189,7 @@ function resetRun(playerId) {
   }
   worldReset(playerId);
   G.press = null; G.endTab = 'story';
+  G.clock = ROUND_SECONDS; G.sealed = false; G.scored = false; G.share = null; G.postPick = 0; G.human = false; G.doorHint = false;
 }
 
 function startGame(id) {
@@ -323,8 +324,9 @@ function update(dt) {
     const beats = gaggleBeats(G.flags, G.ledger);
     if (G.gaggleT > beats.length * 5.5 + 1) {
       G.endingId = computeEndingId(G);
-      G.screen = 'end';
       sfx('sign');
+      if (G.human) { G.screen = 'room'; G.zone = 'lawn'; enterZone('lawn', { x: 640, y: 1330 }); startPressConference(true); }
+      else G.screen = 'end';
     }
   }
 }
@@ -390,8 +392,8 @@ function handleClicks() {
     if (clicked('HOW')) { G.screen = 'how'; sfx('ui'); }
   } else if (G.screen === 'cast') {
     for (const k of CAST) {
-      if (k.starter && clicked('pick_' + k.id)) { startGame(k.id); return; }
-      if (k.locked && UNLOCKED.trump && clicked('pick_' + k.id)) { startGame(k.id); return; }
+      if (k.starter && clicked('pick_' + k.id)) { startGame(k.id); G.human = true; return; }
+      if (k.locked && UNLOCKED.trump && clicked('pick_' + k.id)) { startGame(k.id); G.human = true; return; }
     }
     if (clicked('back_title')) { G.screen = 'title'; sfx('ui'); }
   } else if (G.screen === 'how') {
@@ -430,9 +432,13 @@ function handleClicks() {
       if (clicked('mic_nobody')) { pickMic('nobody'); return; }
     }
   } else if (G.screen === 'end') {
-    if (clicked('again')) { UNLOCKED.trump = true; saveUnlocks(); startGame(G.playerId); return; }
+    if (clicked('again')) { UNLOCKED.trump = true; saveUnlocks(); startGame(G.playerId); G.human = true; return; }
     if (clicked('another')) { UNLOCKED.trump = true; saveUnlocks(); G.screen = 'cast'; return; }
     if (clicked('tab_aura')) { G.endTab = G.endTab === 'aura' ? 'story' : 'aura'; sfx('ui'); return; }
+    if (clicked('tab_board')) { G.endTab = G.endTab === 'board' ? 'story' : 'board'; sfx('ui'); return; }
+    for (let i = 0; i < 3; i++) if (clicked('post_' + i)) { G.postPick = i; sfx('ui'); return; }
+    if (clicked('post_go')) { openXPost(); return; }
+    if (clicked('post_copy')) { copyXPost(); return; }
   }
   if (clicked('mute')) toggleMute();
 }

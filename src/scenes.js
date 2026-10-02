@@ -251,6 +251,13 @@ function drawHUD(c) {
   rr(c, W / 2 - ow / 2, 14, ow, 30, 8); c.fill();
   c.fillStyle = PAL.gold2; c.textAlign = 'center';
   c.fillText(obj, W / 2, 34);
+  /* the press clock */
+  if (G.human && !G.sealed) {
+    const m = Math.floor(G.clock / 60), sec = Math.floor(G.clock % 60), low = G.clock < 30;
+    c.fillStyle = low ? 'rgba(120,20,20,0.85)' : 'rgba(7,10,18,0.7)'; rr(c, W - 262, 14, 156, 30, 8); c.fill();
+    c.fillStyle = low ? '#ffb0a8' : PAL.gold2; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'center';
+    c.fillText('PRESS IN ' + m + ':' + (sec < 10 ? '0' : '') + sec, W - 184, 34);
+  }
   /* pause hint */
   c.fillStyle = 'rgba(7,10,18,0.7)';
   rr(c, W - 96, 14, 82, 30, 8); c.fill();
@@ -505,6 +512,7 @@ function drawAuraReport(c, rx, rw) {
 }
 
 function drawEnd(c, t) {
+  if (!G.scored) finishRun();
   const e = ENDINGS[G.endingId];
   const g = c.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#0c1220'); g.addColorStop(1, '#101b2d');
@@ -522,9 +530,11 @@ function drawEnd(c, t) {
   /* title */
   const rx = fx + fw + 56, rw = W - rx - 56;
   c.fillStyle = PAL.gold2; c.font = '600 38px Georgia, serif'; c.textAlign = 'left';
-  if (G.endTab !== 'aura') c.fillText(e.title, rx, 112);
+  if (G.endTab === 'story') c.fillText(e.title, rx, 112);
   if (G.endTab === 'aura') {
     drawAuraReport(c, rx, rw);
+  } else if (G.endTab === 'board') {
+    drawBoard(c, rx, rw);
   } else {
     /* the story: each line starts where the last one ended, so wrapped lines never overlap */
     let y = 152;
@@ -534,8 +544,8 @@ function drawEnd(c, t) {
       y = wrapText(c, l, rx, y, rw, 22, 'left') + 36;
     });
     /* share card: fake X post, placed under the story */
-    const sc = shareCard(G);
-    const sw2 = Math.min(460, rw), sh2 = 96, sx2 = rx, sy2 = Math.max(y - 8, 392);
+    const sc = currentPost();
+    const sw2 = Math.min(560, rw), sh2 = 96, sx2 = rx, sy2 = Math.max(y - 8, 380);
     c.fillStyle = '#0c1320'; rr(c, sx2, sy2, sw2, sh2, 10); c.fill();
     c.strokeStyle = '#26365a'; c.lineWidth = 1.5; rr(c, sx2, sy2, sw2, sh2, 10); c.stroke();
     c.fillStyle = '#e8c96a'; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'left';
@@ -544,12 +554,20 @@ function drawEnd(c, t) {
     wrapText(c, sc.txt, sx2 + 16, sy2 + 48, sw2 - 32, 18, 'left');
     c.fillStyle = '#8a9bb0'; c.font = '12px Georgia, serif';
     c.fillText('♥ ' + sc.likes + '   the internet reacts', sx2 + 16, sy2 + sh2 - 12);
+    /* pick your post */
+    c.fillStyle = PAL.gold2; c.font = 'bold 13px Georgia, serif'; c.textAlign = 'left';
+    c.fillText('CHOOSE YOUR POST', rx, sy2 + sh2 + 28);
+    const ow = Math.floor((rw - 24) / 3);
+    POST_TONES.forEach((p, i) => uiBtn(rx + i * (ow + 12), sy2 + sh2 + 38, ow, 38, 'post_' + i, p.label, G.postPick === i));
+    uiBtn(rx, sy2 + sh2 + 86, 190, 38, 'post_go', 'POST TO X  ↗', true);
+    uiBtn(rx + 202, sy2 + sh2 + 86, 150, 38, 'post_copy', G.copied ? 'COPIED' : 'COPY TEXT');
   }
   /* buttons */
   const by = 632;
-  uiBtn(rx, by, 160, 44, 'again', 'PLAY AGAIN');
-  uiBtn(rx + 172, by, 200, 44, 'another', 'TRY ANOTHER CEO');
-  uiBtn(rx + 384, by, 190, 44, 'tab_aura', G.endTab === 'aura' ? 'SHOW THE STORY' : 'AURA REPORT', G.endTab !== 'aura');
+  uiBtn(rx, by, 120, 44, 'again', 'PLAY AGAIN');
+  uiBtn(rx + 130, by, 170, 44, 'another', 'ANOTHER CEO');
+  uiBtn(rx + 310, by, 170, 44, 'tab_aura', G.endTab === 'aura' ? 'THE STORY' : 'AURA REPORT', G.endTab !== 'aura');
+  uiBtn(rx + 490, by, 170, 44, 'tab_board', G.endTab === 'board' ? 'THE STORY' : 'LEADERBOARD', G.endTab !== 'board');
 }
 
 /* ---- ending art variants ---- */

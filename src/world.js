@@ -224,6 +224,11 @@ function worldUpdate(dt) {
     if (dd > 3) { const sp = Math.min(dd, 38 * dt); n.x += ddx / dd * sp; n.y += ddy / dd * sp; n.walking = true; if (Math.abs(ddx) > 2) n.face = ddx < 0 ? -1 : 1; } else n.walking = false;
   }
 
+  if (G.human && !G.sealed) {
+    G.clock -= dt;
+    if (G.clock <= 0) { G.clock = 0; G.sealed = true; toast('The press conference is starting. Everyone to the lawn!'); startPressConference(true); return; }
+  }
+  if (G.human && !G.doorHint && G.roomT > 7) { G.doorHint = true; toast('Doors: far left = the Gallery, far right = the South Lawn. Click one or walk into it.'); }
   /* what is in front of you */
   const targets = worldTargets();
   let best = null, bd = 1e9;
@@ -232,7 +237,7 @@ function worldUpdate(dt) {
     if (d < t.r && d < bd) { best = t; bd = d; }
   }
   G.focus = best;
-  if (best && best.kind === 'portal' && !busy && Math.hypot(best.x - G.px, best.y - G.py) < 30) { enterZone(best.portal.to, best.portal.at); return; }
+  if (best && best.kind === 'portal' && !busy && Math.hypot(best.x - G.px, (best.y - G.py) * 0.8) < 48) { enterZone(best.portal.to, best.portal.at); return; }
 
   /* handshake timing window */
   if (G.hs) updateHandshake(dt);
@@ -352,6 +357,7 @@ function worldClick(sx, sy) {
   const targets = worldTargets();
   let hit = null, bd = 1e9;
   for (const t of targets) {
+    if (t.kind === 'portal' && Math.abs(wx - t.x) < 90 && wy > t.y - 520 && wy < t.y + 80) { hit = t; bd = 0; break; }
     const body = t.person ? 70 : (t.kind === 'portrait' ? 130 : 90);
     const cy = t.person ? t.y - 60 : (t.kind === 'portrait' ? 330 : t.y - 40);
     const d = Math.hypot(t.x - wx, (cy - wy) * (t.kind === 'portrait' ? 0.6 : 1));

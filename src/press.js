@@ -59,8 +59,18 @@ const PRESS_TIME = 12;
 
 function pressReporterName(id) { return (PRESS_BOTS[id] || AMBIENT_PEOPLE[id] || { name: 'Reporter' }); }
 
-function startPressConference() {
+function startPressConference(final) {
   G.press = G.press || { used: {}, sessions: 0 };
+  if (final) {
+    /* the finale: four questions, full value, unused ones first */
+    const pool = PRESS_QUESTIONS.slice().sort((a, b) => ((G.press.used[a.id] ? 1 : 0) - (G.press.used[b.id] ? 1 : 0)) || (idHash(a.id + 'f' + G.t) - idHash(b.id + 'f' + G.t)));
+    const mine = pool.filter((q) => q.home === G.playerId && !G.press.used[q.id]).slice(0, 1);
+    const qs = mine.concat(pool.filter((q) => mine.indexOf(q) < 0)).slice(0, 4);
+    G.press.session = { qs: qs, i: 0, t: 0, answered: null, total: 0, mult: 1, final: true };
+    G.press.sessions++;
+    G.sealed = true; G.screen = 'press'; sfx('shutter');
+    return;
+  }
   const fresh = PRESS_QUESTIONS.filter((q) => !G.press.used[q.id]);
   if (fresh.length < 1) { toast('The press corps has no questions left. You have survived the lawn.'); return; }
   /* three questions: your home turf first, then the rest in a repeatable shuffle */
@@ -98,6 +108,7 @@ function pressTimeout() {
 function pressNext() {
   const ses = G.press.session;
   ses.i++; ses.answered = null; ses.t = 0;
+  if (ses.i >= ses.qs.length && ses.final) { G.press.session = null; finishRun(); return; }
   if (ses.i >= ses.qs.length) { G.screen = 'room'; G.press.session = null; toast('You handled the press. The riser applauds, politely.'); }
 }
 function updatePress(dt) {
@@ -127,6 +138,7 @@ function drawPress(c, t) {
   c.fillStyle = 'rgba(245,239,221,0.7)'; c.font = '12px Georgia'; c.fillText(rep.co || '', 150, 332);
   /* question */
   c.fillStyle = PAL.cream; rr(c, 290, 120, 950, 120, 12); c.fill(); c.strokeStyle = PAL.gold; c.lineWidth = 2.5; rr(c, 290, 120, 950, 120, 12); c.stroke();
+  if (ses.final) { c.fillStyle = PAL.gold2; c.font = 'bold 15px Georgia, serif'; c.textAlign = 'center'; c.fillText('★  THE FINAL PRESS CONFERENCE  ★  your score is decided here', W / 2, 104); }
   c.fillStyle = '#6a5a44'; c.font = 'bold 12px Georgia'; c.textAlign = 'left'; c.fillText('QUESTION ' + (ses.i + 1) + ' OF ' + ses.qs.length + ' · ' + q.topic.toUpperCase(), 312, 146);
   c.fillStyle = PAL.ink; c.font = 'italic 21px Georgia'; wrapText(c, q.q, 312, 178, 906, 28, 'left');
   /* clock */
